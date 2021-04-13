@@ -1,0 +1,3 @@
+[submodule "External\\Nexus"]
+	path = External\\Nexus
+	url = https://github.com/ThIsJaCk23657689/Nexus.git
