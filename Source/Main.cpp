@@ -1,6 +1,8 @@
 #include <imgui.h>
+#include <implot.h>
 
 #include "Application.h"
+#include "FileLoader.h"
 #include "Logger.h"
 #include "FirsrPersonCamera.h"
 #include "ThirdPersonCamera.h"
@@ -94,17 +96,50 @@ public:
 		}
 
 		// ImGui::ShowDemoWindow();
+		// ImPlot::ShowDemoWindow();
 	}
 
 	void ShowDebugUI() override {
+
 		ImGui::Begin("Iso Surface");
-		ImGui::InputText("Volume Data Path", (char*)volume_data_folder_path.c_str(), sizeof(volume_data_folder_path));
-		ImGui::InputText("Volume Data Name", (char*)volume_data_name.c_str(), sizeof(volume_data_folder_path));
+		ImGui::InputText("Volume Data Folder", (char*)volume_data_folder_path.c_str(), sizeof(char) * 128);
+		if (ImGui::Button("Loading Folder")) {
+			file_names_raw = Nexus::FileLoader::GetAllFilesNamesWithinFolder(volume_data_folder_path, "/*.raw");
+			file_names_inf = Nexus::FileLoader::GetAllFilesNamesWithinFolder(volume_data_folder_path, "/*.inf");
+		}
+
+		if (ImGui::BeginCombo("Volume Data (Raw)", current_item_raw.c_str())) {
+			for (int n = 0; n < file_names_raw.size(); n++) {
+				bool is_selected = (current_item_raw == file_names_raw[n]);
+				if (ImGui::Selectable(file_names_raw[n].c_str(), is_selected)) {
+					current_item_raw = file_names_raw[n];
+				}
+				if (is_selected) {
+					ImGui::SetItemDefaultFocus();
+				}
+			}
+			ImGui::EndCombo();
+		}
+
+		if (ImGui::BeginCombo("Volume Data (Inf)", current_item_inf.c_str())) {
+			for (int n = 0; n < file_names_inf.size(); n++) {
+				bool is_selected = (current_item_inf == file_names_inf[n]);
+				if (ImGui::Selectable(file_names_inf[n].c_str(), is_selected)) {
+					current_item_inf = file_names_inf[n];
+				}
+				if (is_selected) {
+					ImGui::SetItemDefaultFocus();
+				}
+			}
+			ImGui::EndCombo();
+		}
+		
 		if (ImGui::Button("Loading Files")) {
-			engine->Initialize(volume_data_folder_path + "/" + volume_data_name + ".inf", volume_data_folder_path + "/" + volume_data_name + ".raw");
-			engine_2->Initialize(volume_data_folder_path + "/" + volume_data_name + ".inf", volume_data_folder_path + "/" + volume_data_name + ".raw");
-			volume_data_histogram = engine->GetnHistogramData();
+			engine->Initialize(volume_data_folder_path + "/" + current_item_inf, volume_data_folder_path + "/" + current_item_raw);
+			engine_2->Initialize(volume_data_folder_path + "/" + current_item_inf, volume_data_folder_path + "/" + current_item_raw);
+			volume_data_histogram = engine->GetHistogramData();
 			volume_data_max = *std::max_element(volume_data_histogram.cbegin(), volume_data_histogram.cend());
+			
 		
 			/*
 			unsigned int total = 0;
@@ -117,11 +152,12 @@ public:
 		}
 		
 		ImGui::SliderFloat("Iso Value", &iso_value, 0, 255);
+		ImGui::SliderFloat("Max Gradient", &max_gradient, 1.0f, 10.0f);
 		if (ImGui::Button("Generate")) {
 			if (engine->GetIsInitialize()) {
-				engine->ConvertToPolygon(iso_value);
+				engine->ConvertToPolygon(iso_value, max_gradient);
 				engine->Debug();
-				engine_2->ConvertToPolygon(250.0f);
+				engine_2->ConvertToPolygon(250.0f, max_gradient);
 				engine_2->Debug();
 			} else {
 				Nexus::Logger::Message(Nexus::LOG_ERROR, "YOU MUST LOAD THE VOLUME DATA FIRST and COMPUTE THESE ISO SURFACE VERTICES.");
@@ -132,9 +168,18 @@ public:
 		ImGui::Checkbox("Normal Visualize", &Settings.NormalVisualize);
 		ImGui::SameLine();
 		ImGui::Checkbox("Wire Frame Mode", engine->WireFrameModeHelper());
+
+		
+		
 		if (engine->GetIsInitialize()) {
 			if (ImGui::CollapsingHeader("Histograms")) {
 				ImGui::PlotHistogram("Histogram", volume_data_histogram.data(), volume_data_histogram.size(), 0, NULL, 0.0f, volume_data_max, ImVec2(0, 300));
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("Equalization")) {
+				engine->HistogramEqualization();
+				volume_data_histogram = engine->GetHistogramData();
+				
 			}
 		}
 		ImGui::End();
@@ -460,8 +505,12 @@ private:
 
 	bool is_loaded_file = false;
 	std::string volume_data_folder_path = "C:/Users/user/Desktop/OpenGL/Scalar";
-	std::string volume_data_name = "engine";
+	std::vector<std::string> file_names_raw;
+	std::vector<std::string> file_names_inf;
+	std::string current_item_raw = "Please select..";
+	std::string current_item_inf = "Please select..";
 	std::vector<float> volume_data_histogram;
+	float max_gradient = 1.0f;
 	float volume_data_max;
 	float iso_value = 80.0;
 };
