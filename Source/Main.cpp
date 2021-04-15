@@ -54,7 +54,6 @@ public:
 
 		// Create object data
 		engine = std::make_unique<Nexus::IsoSurface>();
-		engine_2 = std::make_unique<Nexus::IsoSurface>();
 		
 		cube = std::make_unique<Nexus::Cube>();
 		sphere = std::make_unique<Nexus::Sphere>();
@@ -84,7 +83,6 @@ public:
 			myShader->SetVec3("objectColor", glm::vec3(0.482352941, 0.68627451, 0.929411765));
 			engine->Draw(myShader.get(), model->Top());
 			myShader->SetVec3("objectColor", glm::vec3(0.929411765, 0.68627451, 0.482352941));
-			engine_2->Draw(myShader.get(), model->Top());
 			if (Settings.NormalVisualize) {	
 				normalShader->Use();
 				normalShader->SetMat4("view", view);
@@ -95,98 +93,160 @@ public:
 			model->Pop();
 		}
 
-		// ImGui::ShowDemoWindow();
-		// ImPlot::ShowDemoWindow();
+		ImGui::ShowDemoWindow();
+		ImPlot::ShowDemoWindow();
 	}
 
 	void ShowDebugUI() override {
 
-		ImGui::Begin("Iso Surface");
-		ImGui::InputText("Volume Data Folder", (char*)volume_data_folder_path.c_str(), sizeof(char) * 128);
-		if (ImGui::Button("Loading Folder")) {
-			file_names_raw = Nexus::FileLoader::GetAllFilesNamesWithinFolder(volume_data_folder_path, "/*.raw");
-			file_names_inf = Nexus::FileLoader::GetAllFilesNamesWithinFolder(volume_data_folder_path, "/*.inf");
-		}
+		ImGuiTabBarFlags tab_bar_flags = ImGuiBackendFlags_None;
+		ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+		ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
 
-		if (ImGui::BeginCombo("Volume Data (Raw)", current_item_raw.c_str())) {
-			for (int n = 0; n < file_names_raw.size(); n++) {
-				bool is_selected = (current_item_raw == file_names_raw[n]);
-				if (ImGui::Selectable(file_names_raw[n].c_str(), is_selected)) {
-					current_item_raw = file_names_raw[n];
-				}
-				if (is_selected) {
-					ImGui::SetItemDefaultFocus();
-				}
-			}
-			ImGui::EndCombo();
-		}
+		ImGui::Begin("Volume Control Center");
+		if (ImGui::BeginTabBar("VolumeTabBar", tab_bar_flags)) {
+			if (ImGui::BeginTabItem("File Setting")) {
+				ImGui::TextColored(ImVec4(0.9f, 0.8f, 0.0f, 1.0f), "1. Input a folder path which has volume data to load in.");
+				ImGui::InputText("Volume Data Folder", volume_data_folder_path, IM_ARRAYSIZE(volume_data_folder_path));
+				if (ImGui::Button("Loading Folder")) {
+					file_names_raw = Nexus::FileLoader::GetAllFilesNamesWithinFolder(std::string(volume_data_folder_path), "/*.raw");
+					file_names_inf = Nexus::FileLoader::GetAllFilesNamesWithinFolder(std::string(volume_data_folder_path), "/*.inf");
 
-		if (ImGui::BeginCombo("Volume Data (Inf)", current_item_inf.c_str())) {
-			for (int n = 0; n < file_names_inf.size(); n++) {
-				bool is_selected = (current_item_inf == file_names_inf[n]);
-				if (ImGui::Selectable(file_names_inf[n].c_str(), is_selected)) {
-					current_item_inf = file_names_inf[n];
+					if (file_names_raw.empty() || file_names_inf.empty()) {
+						Nexus::Logger::Message(Nexus::LOG_WARNING, "There is no any volume data (.raw and .inf) files in this folder: ");
+						Nexus::Logger::Message(Nexus::LOG_WARNING, std::string(volume_data_folder_path));
+						Nexus::Logger::Message(Nexus::LOG_WARNING, "Please try another folder path to load.");
+						current_item_raw = "none";
+						current_item_inf = "none";
+						ImGui::OpenPopup("Error: 01");
+					} else {
+						Nexus::Logger::Message(Nexus::LOG_INFO, "Folder Path: " + std::string(volume_data_folder_path));
+						Nexus::Logger::Message(Nexus::LOG_INFO, "Found " + std::to_string(file_names_raw.size()) + " raw files.");
+						Nexus::Logger::Message(Nexus::LOG_INFO, "Found " + std::to_string(file_names_inf.size()) + " inf files.");
+						current_item_raw = "Please select a file...";
+						current_item_inf = "Please select a file...";
+					}
 				}
-				if (is_selected) {
+
+				if (ImGui::BeginPopupModal("Error: 01", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+					ImGui::Text("There is no any volume data (.raw and .inf) files in this folder:\n");
+					ImGui::TextColored(ImVec4(0.6f, 0.8f, 0.0f, 1.0f), volume_data_folder_path);
+					ImGui::Text("Please try another folder path to load.\n\n");
+					ImGui::Separator();
+
+					if (ImGui::Button("OK", ImVec2(120, 0))) { ImGui::CloseCurrentPopup(); }
 					ImGui::SetItemDefaultFocus();
+					ImGui::EndPopup();
 				}
+				
+				ImGui::Spacing();
+				ImGui::Separator();
+
+				ImGui::TextColored(ImVec4(0.9f, 0.8f, 0.0f, 1.0f), "2. Select a volume data (raw and inf) to load.");
+				if (ImGui::BeginCombo("Volume Data (Raw)", current_item_raw.c_str())) {
+					for (int n = 0; n < file_names_raw.size(); n++) {
+						bool is_selected = (current_item_raw == file_names_raw[n]);
+						if (ImGui::Selectable(file_names_raw[n].c_str(), is_selected)) {
+							current_item_raw = file_names_raw[n];
+						}
+						if (is_selected) {
+							ImGui::SetItemDefaultFocus();
+						}
+					}
+					ImGui::EndCombo();
+				}
+				if (ImGui::BeginCombo("Volume Data (Inf)", current_item_inf.c_str())) {
+					for (int n = 0; n < file_names_inf.size(); n++) {
+						bool is_selected = (current_item_inf == file_names_inf[n]);
+						if (ImGui::Selectable(file_names_inf[n].c_str(), is_selected)) {
+							current_item_inf = file_names_inf[n];
+						}
+						if (is_selected) {
+							ImGui::SetItemDefaultFocus();
+						}
+					}
+					ImGui::EndCombo();
+				}
+				ImGui::SliderFloat("Gradient Threshold", &max_gradient, 1.0f, 250.0f);
+				if (ImGui::Button("Loading Files")) {
+					if (file_names_raw.empty() || file_names_inf.empty() || current_item_raw == "Please select a file..." || current_item_inf == "Please select a file..." || current_item_raw == "none" || current_item_inf == "none") {
+						Nexus::Logger::Message(Nexus::LOG_ERROR, "Please select a folder path and choose a volume data first!");
+						ImGui::OpenPopup("Error: 02");
+					} else {
+						engine->Initialize(std::string(volume_data_folder_path) + "/" + current_item_inf, std::string(volume_data_folder_path) + "/" + current_item_raw, max_gradient);
+						volume_data_histogram = engine->GetHistogramData();
+						volume_data_max = *std::max_element(volume_data_histogram.cbegin(), volume_data_histogram.cend());
+
+						gradient_histogram = engine->GetGradientHistogram(max_gradient);
+						gradient_max = *std::max_element(gradient_histogram.cbegin(), gradient_histogram.cend());
+					}
+				}
+				ImGui::Spacing();
+				ImGui::Separator();
+				
+				if (engine->GetIsInitialize()) {
+					if (ImGui::CollapsingHeader("Gradient Histograms")) {
+						ImGui::PlotHistogram("Gradient Divided", gradient_histogram.data(), gradient_histogram.size(), 0, NULL, 0.0f, gradient_max, ImVec2(0, 300));
+					}
+				}
+				
+				if (ImGui::BeginPopupModal("Error: 02", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+					ImGui::Text("Please select a folder path and choose a volume data first!\n\n");
+					ImGui::Separator();
+
+					if (ImGui::Button("OK", ImVec2(120, 0))) { ImGui::CloseCurrentPopup(); }
+					ImGui::SetItemDefaultFocus();
+					ImGui::EndPopup();
+				}
+
+				// 顯示所讀取的 raw 和 inf 資料
+
+
+				
+				
+				ImGui::EndTabItem();
 			}
-			ImGui::EndCombo();
-		}
-		
-		if (ImGui::Button("Loading Files")) {
-			engine->Initialize(volume_data_folder_path + "/" + current_item_inf, volume_data_folder_path + "/" + current_item_raw);
-			engine_2->Initialize(volume_data_folder_path + "/" + current_item_inf, volume_data_folder_path + "/" + current_item_raw);
-			volume_data_histogram = engine->GetHistogramData();
-			volume_data_max = *std::max_element(volume_data_histogram.cbegin(), volume_data_histogram.cend());
-			
-		
-			/*
-			unsigned int total = 0;
-			for (auto i : volume_data_histogram) {
-				std::cout << i << std::endl;
-				total += i;
-			}
-			std::cout << total << std::endl;
-			*/
-		}
-		
-		ImGui::SliderFloat("Iso Value", &iso_value, 0, 255);
-		ImGui::SliderFloat("Max Gradient", &max_gradient, 1.0f, 10.0f);
-		if (ImGui::Button("Generate")) {
-			if (engine->GetIsInitialize()) {
-				engine->ConvertToPolygon(iso_value, max_gradient);
-				engine->Debug();
-				engine_2->ConvertToPolygon(250.0f, max_gradient);
-				engine_2->Debug();
-			} else {
-				Nexus::Logger::Message(Nexus::LOG_ERROR, "YOU MUST LOAD THE VOLUME DATA FIRST and COMPUTE THESE ISO SURFACE VERTICES.");
+
+			if (ImGui::BeginTabItem("Volume Setting")) {
+				if (engine->GetIsInitialize()) {
+					if (ImGui::CollapsingHeader("Histograms")) {
+						ImGui::PlotHistogram("Histogram", volume_data_histogram.data(), volume_data_histogram.size(), 0, NULL, 0.0f, volume_data_max, ImVec2(0, 300));
+					}
+					if (ImGui::Button("Equalization")) {
+						engine->HistogramEqualization();
+						volume_data_histogram = engine->GetHistogramData();
+					}
+					ImGui::Spacing();
+					ImGui::Separator();
+					ImGui::SliderFloat("Iso Value", &iso_value, 0, 255);
+					if (ImGui::Button("Generate")) {
+						if (engine->GetIsInitialize()) {
+							engine->ConvertToPolygon(iso_value);
+							engine->Debug();
+						} else {
+							Nexus::Logger::Message(Nexus::LOG_ERROR, "YOU MUST LOAD THE VOLUME DATA FIRST and COMPUTE THESE ISO SURFACE VERTICES.");
+						}
+					}
+				} else {
+					ImGui::TextColored(ImVec4(0.9f, 0.2f, 0.0f, 1.0f), "You must load the volume data first and compute these iso surface vertices.");
+				}
+				ImGui::Spacing();
+				ImGui::Separator();
+				ImGui::Checkbox("Normal Visualize", &Settings.NormalVisualize);
+				ImGui::SameLine();
+				ImGui::Checkbox("Wire Frame Mode", engine->WireFrameModeHelper());
+				
+				
+				ImGui::EndTabItem();
 			}
 		}
 		ImGui::Spacing();
-
-		ImGui::Checkbox("Normal Visualize", &Settings.NormalVisualize);
-		ImGui::SameLine();
-		ImGui::Checkbox("Wire Frame Mode", engine->WireFrameModeHelper());
-
-		
-		
-		if (engine->GetIsInitialize()) {
-			if (ImGui::CollapsingHeader("Histograms")) {
-				ImGui::PlotHistogram("Histogram", volume_data_histogram.data(), volume_data_histogram.size(), 0, NULL, 0.0f, volume_data_max, ImVec2(0, 300));
-			}
-			ImGui::SameLine();
-			if (ImGui::Button("Equalization")) {
-				engine->HistogramEqualization();
-				volume_data_histogram = engine->GetHistogramData();
-				
-			}
-		}
+		ImGui::Separator();
 		ImGui::End();
+
 		
-		ImGui::Begin("Setting");
-		ImGuiTabBarFlags tab_bar_flags = ImGuiBackendFlags_None;
-		if (ImGui::BeginTabBar("MyTabBar", tab_bar_flags)) {
+		ImGui::Begin("General Setting");
+		if (ImGui::BeginTabBar("GeneralTabBar", tab_bar_flags)) {
 			if (ImGui::BeginTabItem("Camera")) {
 				ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 				if (Settings.EnableGhostMode) {
@@ -501,17 +561,18 @@ private:
 	std::unique_ptr<Nexus::Sphere> sphere = nullptr;
 
 	std::unique_ptr<Nexus::IsoSurface> engine = nullptr;
-	std::unique_ptr<Nexus::IsoSurface> engine_2 = nullptr;
 
 	bool is_loaded_file = false;
-	std::string volume_data_folder_path = "C:/Users/user/Desktop/OpenGL/Scalar";
+	char volume_data_folder_path[128] = "Resource/VolumeData";
 	std::vector<std::string> file_names_raw;
 	std::vector<std::string> file_names_inf;
-	std::string current_item_raw = "Please select..";
-	std::string current_item_inf = "Please select..";
+	std::string current_item_raw = "none";
+	std::string current_item_inf = "none";
 	std::vector<float> volume_data_histogram;
-	float max_gradient = 1.0f;
+	std::vector<float> gradient_histogram;
+	float max_gradient = 100.0f;
 	float volume_data_max;
+	float gradient_max;
 	float iso_value = 80.0;
 };
 
