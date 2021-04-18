@@ -1,4 +1,6 @@
 #include <imgui.h>
+#include <imgui_impl_glfw.h>
+#include <imgui_impl_opengl3.h>
 #include <implot.h>
 
 #include "Application.h"
@@ -13,6 +15,7 @@
 #include "Cube.h"
 #include "Sphere.h"
 #include <algorithm>
+#include <numeric>
 #include <random>
 
 class VolumeRendering final : public Nexus::Application {
@@ -173,20 +176,53 @@ public:
 						Nexus::Logger::Message(Nexus::LOG_ERROR, "Please select a folder path and choose a volume data first!");
 						ImGui::OpenPopup("Error: 02");
 					} else {
+						// 初始化
 						engine->Initialize(std::string(volume_data_folder_path) + "/" + current_item_inf, std::string(volume_data_folder_path) + "/" + current_item_raw, max_gradient);
-						volume_data_histogram = engine->GetHistogramData();
-						volume_data_max = *std::max_element(volume_data_histogram.cbegin(), volume_data_histogram.cend());
 
-						gradient_histogram = engine->GetGradientHistogram(max_gradient);
-						gradient_max = *std::max_element(gradient_histogram.cbegin(), gradient_histogram.cend());
+						iso_value_histogram = engine->GetIsoValueHistogram();
+						iso_value_histogram_max = *std::max_element(iso_value_histogram.cbegin(), iso_value_histogram.cend());
+
+						gradient_histogram = engine->GetGradientHistogram();
+						gradient_histogram_max = *std::max_element(gradient_histogram.cbegin(), gradient_histogram.cend());
+
+						gradient_heatmap = engine->GetGradientHeatmap();
+						gradient_heatmap_max = 140.0f;
+						gradient_heatmap_min = 0.0f;
+						gradient_heatmap_labelx = engine->GetGradientHeatmapAxisLabels(true);
+						gradient_heatmap_labely = engine->GetGradientHeatmapAxisLabels(false);
+
 					}
 				}
 				ImGui::Spacing();
-				ImGui::Separator();
+				// ImGui::Separator();
 				
 				if (engine->GetIsInitialize()) {
-					if (ImGui::CollapsingHeader("Gradient Histograms")) {
-						ImGui::PlotHistogram("Gradient Divided", gradient_histogram.data(), gradient_histogram.size(), 0, NULL, 0.0f, gradient_max, ImVec2(0, 300));
+					if (ImGui::CollapsingHeader("Gradient Histogram")) {
+						ImGui::PlotHistogram("Gradient Histogram", gradient_histogram.data(), gradient_histogram.size(), 0, NULL, 0.0f, gradient_histogram_max, ImVec2(0, 300));
+					}
+					if (ImGui::CollapsingHeader("Gradient Heatmaps")) {
+						static ImPlotColormap map = ImPlotColormap_Viridis;
+						if (ImPlot::ColormapButton(ImPlot::GetColormapName(map), ImVec2(512, 0), map)) {
+							map = (map + 1) % ImPlot::GetColormapCount();
+							ImPlot::BustColorCache("##Heatmap1");
+						}
+						ImGui::SameLine();
+						ImGui::LabelText("##Colormap Index", "%s", "Change Colormap");
+
+						ImGui::SetNextItemWidth(512);
+						ImGui::DragFloatRange2("Min / Max", &gradient_heatmap_min, &gradient_heatmap_max, 10.0f, 0, 20000);
+
+						static ImPlotAxisFlags axes_flags = ImPlotAxisFlags_Lock | ImPlotAxisFlags_NoGridLines | ImPlotAxisFlags_NoTickMarks;
+						ImPlot::PushColormap(map);
+						ImPlot::SetNextPlotTicksX(0, 1, 5, gradient_heatmap_labelx.data());
+						ImPlot::SetNextPlotTicksY(1, 0, 5, gradient_heatmap_labely.data());
+						if (ImPlot::BeginPlot("##Heatmap1", NULL, NULL, ImVec2(512, 512), ImPlotFlags_NoLegend, axes_flags, axes_flags)) {
+							ImPlot::PlotHeatmap("heat", gradient_heatmap.data(), engine->Interval, engine->Interval, gradient_heatmap_min, gradient_heatmap_max, NULL);
+							ImPlot::EndPlot();
+						}
+						ImGui::SameLine();
+						ImPlot::ColormapScale("##HeatScale", gradient_heatmap_min, gradient_heatmap_max, ImVec2(60, 512));
+						ImPlot::PopColormap();
 					}
 				}
 				
@@ -201,20 +237,22 @@ public:
 
 				// 顯示所讀取的 raw 和 inf 資料
 
-
-				
-				
 				ImGui::EndTabItem();
 			}
 
 			if (ImGui::BeginTabItem("Volume Setting")) {
 				if (engine->GetIsInitialize()) {
 					if (ImGui::CollapsingHeader("Histograms")) {
-						ImGui::PlotHistogram("Histogram", volume_data_histogram.data(), volume_data_histogram.size(), 0, NULL, 0.0f, volume_data_max, ImVec2(0, 300));
+						ImGui::PlotHistogram("Histogram", iso_value_histogram.data(), iso_value_histogram.size(), 0, NULL, 0.0f, iso_value_histogram_max, ImVec2(0, 300));
 					}
 					if (ImGui::Button("Equalization")) {
-						engine->HistogramEqualization();
-						volume_data_histogram = engine->GetHistogramData();
+						engine->IsoValueHistogramEqualization();
+						iso_value_histogram = engine->GetIsoValueHistogram();
+
+						engine->GenerateGradientHeatMap();
+						gradient_heatmap = engine->GetGradientHeatmap();
+						gradient_heatmap_max = *std::max_element(gradient_heatmap.cbegin(), gradient_heatmap.cend());
+						gradient_heatmap_min = *std::min_element(gradient_heatmap.cbegin(), gradient_heatmap.cend());
 					}
 					ImGui::Spacing();
 					ImGui::Separator();
@@ -568,12 +606,18 @@ private:
 	std::vector<std::string> file_names_inf;
 	std::string current_item_raw = "none";
 	std::string current_item_inf = "none";
-	std::vector<float> volume_data_histogram;
+
+	std::vector<float> iso_value_histogram;
 	std::vector<float> gradient_histogram;
-	float max_gradient = 100.0f;
-	float volume_data_max;
-	float gradient_max;
+	std::vector<float> gradient_heatmap;
+	std::vector<char*> gradient_heatmap_labelx;
+	std::vector<char*> gradient_heatmap_labely;
 	float iso_value = 80.0;
+	float max_gradient = 100.0f;
+	float iso_value_histogram_max;
+	float gradient_histogram_max;
+	float gradient_heatmap_max;
+	float gradient_heatmap_min;
 };
 
 int main() {
