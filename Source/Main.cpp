@@ -1,8 +1,3 @@
-#include <imgui.h>
-#include <imgui_impl_glfw.h>
-#include <imgui_impl_opengl3.h>
-#include <implot.h>
-
 #include "Application.h"
 #include "FileLoader.h"
 #include "Logger.h"
@@ -11,19 +6,27 @@
 #include "Shader.h"
 #include "MatrixStack.h"
 #include "IsoSurface.h"
-
 #include "Cube.h"
 #include "Sphere.h"
+
+#include <stb_image.h>
+#include <imgui.h>
+#include <imgui_internal.h>
+#include <imgui_impl_glfw.h>
+#include <imgui_impl_opengl3.h>
+#include <imgui_bazier.h>
+#include <implot.h>
 #include <algorithm>
-#include <numeric>
 #include <random>
+#include <transfer_function_widget.h>
+
 
 class VolumeRendering final : public Nexus::Application {
 public:
 	VolumeRendering() {
 		Settings.Width = 800;
 		Settings.Height = 600;
-		Settings.WindowTitle = "Iso Surface | Nexus";
+		Settings.WindowTitle = "Scientific Visualization | Project #2: Transfer Function Design";
 		Settings.EnableDebugCallback = true;
 		Settings.EnableFullScreen = false;
 
@@ -33,7 +36,7 @@ public:
 		// Projection Settings Initalize
 		ProjectionSettings.IsPerspective = true;
 		ProjectionSettings.ClippingNear = 0.1f;
-		ProjectionSettings.ClippingFar = 500.0f;
+		ProjectionSettings.ClippingFar = 1000.0f;
 		ProjectionSettings.Aspect = static_cast<float>(Settings.Width) / static_cast<float>(Settings.Height);
 	}
 
@@ -43,6 +46,10 @@ public:
 		glEnable(GL_DEPTH_TEST);
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+		// ImGui Setting
+		ImGuiIO& io = ImGui::GetIO();
+		io.Fonts->AddFontFromFileTTF("Resource/Fronts/ComicNeue-Regular.ttf", 18.0f);
 
 		// Create shader program
 		myShader = std::make_unique<Nexus::Shader>("Shaders/simple_lighting.vert", "Shaders/simple_lighting.frag");
@@ -60,6 +67,8 @@ public:
 		
 		cube = std::make_unique<Nexus::Cube>();
 		sphere = std::make_unique<Nexus::Sphere>();
+
+		transfer_function_texture = GetTFTexture(tf_widget);
 	}
 
 	void Update(Nexus::DisplayMode monitor_type) override {
@@ -69,6 +78,9 @@ public:
 		SetViewport(Nexus::DISPLAY_MODE_DEFAULT);
 
 		myShader->Use();
+		myShader->SetBool("is_volume", false);
+		myShader->SetBool("enable_transfer_function", enable_transfer_function);
+		myShader->SetFloat("iso_value", iso_value_shader);
 		myShader->SetMat4("view", view);
 		myShader->SetMat4("projection", projection);
 		myShader->SetVec3("lightPos", Settings.EnableGhostMode? first_camera->GetPosition() : third_camera->GetPosition());
@@ -84,9 +96,11 @@ public:
 			model->Push();
 			model->Save(glm::translate(model->Top(), glm::vec3(-149 / 2.0f, -208 / 2.0f, -110 / 2.0f)));
 			myShader->SetVec3("objectColor", glm::vec3(0.482352941, 0.68627451, 0.929411765));
+			glActiveTexture(GL_TEXTURE1);
+			glBindTexture(GL_TEXTURE_1D, transfer_function_texture);
 			engine->Draw(myShader.get(), model->Top());
 			myShader->SetVec3("objectColor", glm::vec3(0.929411765, 0.68627451, 0.482352941));
-			if (Settings.NormalVisualize) {	
+			if (Settings.NormalVisualize) {
 				normalShader->Use();
 				normalShader->SetMat4("view", view);
 				normalShader->SetMat4("projection", projection);
@@ -96,8 +110,9 @@ public:
 			model->Pop();
 		}
 
-		ImGui::ShowDemoWindow();
-		ImPlot::ShowDemoWindow();
+		// ImGui::ShowDemoWindow();
+		// ImPlot::ShowDemoWindow();
+		// ImGui::ShowBezierDemo();
 	}
 
 	void ShowDebugUI() override {
@@ -105,7 +120,17 @@ public:
 		ImGuiTabBarFlags tab_bar_flags = ImGuiBackendFlags_None;
 		ImVec2 center = ImGui::GetMainViewport()->GetCenter();
 		ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-
+		
+		ImGui::Begin("Transfer Function");
+		if (ImGui::Button("Export")) {
+			Nexus::FileLoader::OutputTransferFunction("Resource/Exports/transfer.txt", tf_widget.get_colormapf(), engine.get());
+		}
+		ImGui::Checkbox("Enable Transfer Function", &enable_transfer_function);
+		tf_widget.draw_ui();
+		glDeleteTextures(1, &transfer_function_texture);
+		transfer_function_texture = GetTFTexture(tf_widget);
+		ImGui::End();
+		
 		ImGui::Begin("Volume Control Center");
 		if (ImGui::BeginTabBar("VolumeTabBar", tab_bar_flags)) {
 			if (ImGui::BeginTabItem("File Setting")) {
@@ -121,7 +146,7 @@ public:
 						Nexus::Logger::Message(Nexus::LOG_WARNING, "Please try another folder path to load.");
 						current_item_raw = "none";
 						current_item_inf = "none";
-						ImGui::OpenPopup("Error: 01");
+						ImGui::OpenPopup("Error##01");
 					} else {
 						Nexus::Logger::Message(Nexus::LOG_INFO, "Folder Path: " + std::string(volume_data_folder_path));
 						Nexus::Logger::Message(Nexus::LOG_INFO, "Found " + std::to_string(file_names_raw.size()) + " raw files.");
@@ -130,18 +155,20 @@ public:
 						current_item_inf = "Please select a file...";
 					}
 				}
+				
 
-				if (ImGui::BeginPopupModal("Error: 01", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+				if (ImGui::BeginPopupModal("Error##01", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
 					ImGui::Text("There is no any volume data (.raw and .inf) files in this folder:\n");
 					ImGui::TextColored(ImVec4(0.6f, 0.8f, 0.0f, 1.0f), volume_data_folder_path);
 					ImGui::Text("Please try another folder path to load.\n\n");
 					ImGui::Separator();
+					
 
+					
 					if (ImGui::Button("OK", ImVec2(120, 0))) { ImGui::CloseCurrentPopup(); }
 					ImGui::SetItemDefaultFocus();
 					ImGui::EndPopup();
 				}
-				
 				ImGui::Spacing();
 				ImGui::Separator();
 
@@ -174,7 +201,7 @@ public:
 				if (ImGui::Button("Loading Files")) {
 					if (file_names_raw.empty() || file_names_inf.empty() || current_item_raw == "Please select a file..." || current_item_inf == "Please select a file..." || current_item_raw == "none" || current_item_inf == "none") {
 						Nexus::Logger::Message(Nexus::LOG_ERROR, "Please select a folder path and choose a volume data first!");
-						ImGui::OpenPopup("Error: 02");
+						ImGui::OpenPopup("Error##02");
 					} else {
 						// ªì©l¤Æ
 						engine->Initialize(std::string(volume_data_folder_path) + "/" + current_item_inf, std::string(volume_data_folder_path) + "/" + current_item_raw, max_gradient);
@@ -190,7 +217,6 @@ public:
 						gradient_heatmap_min = 0.0f;
 						gradient_heatmap_labelx = engine->GetGradientHeatmapAxisLabels(true);
 						gradient_heatmap_labely = engine->GetGradientHeatmapAxisLabels(false);
-
 					}
 				}
 				ImGui::Spacing();
@@ -226,7 +252,7 @@ public:
 					}
 				}
 				
-				if (ImGui::BeginPopupModal("Error: 02", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+				if (ImGui::BeginPopupModal("Error##02", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
 					ImGui::Text("Please select a folder path and choose a volume data first!\n\n");
 					ImGui::Separator();
 
@@ -261,6 +287,7 @@ public:
 						if (engine->GetIsInitialize()) {
 							engine->ConvertToPolygon(iso_value);
 							engine->Debug();
+							iso_value_shader = iso_value;
 						} else {
 							Nexus::Logger::Message(Nexus::LOG_ERROR, "YOU MUST LOAD THE VOLUME DATA FIRST and COMPUTE THESE ISO SURFACE VERTICES.");
 						}
@@ -583,6 +610,28 @@ public:
 			ProjectionSettings.OrthogonalHeight = 1000.0f;
 		}
 	}
+
+	GLuint GetTFTexture(TransferFunctionWidget& tf_widget) {
+		const std::vector<float>& colormap = tf_widget.get_colormapf();
+		const size_t texel_count = colormap.size() / 4;
+
+		// Make it into a 1D texture
+		GLuint texture;
+		glGenTextures(1, &texture);
+
+		glBindTexture(GL_TEXTURE_1D, texture);
+		glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+		
+		// Upload it to the GPU
+		glTexImage1D(GL_TEXTURE_1D, 0, GL_RGBA, texel_count, 0, GL_RGBA, GL_FLOAT, colormap.data());
+
+		glBindTexture(GL_TEXTURE_1D, 0);
+
+		return texture;
+	}
 	
 private:
 	std::unique_ptr<Nexus::Shader> myShader = nullptr;
@@ -613,11 +662,16 @@ private:
 	std::vector<char*> gradient_heatmap_labelx;
 	std::vector<char*> gradient_heatmap_labely;
 	float iso_value = 80.0;
+	float iso_value_shader = 80.0;
 	float max_gradient = 100.0f;
 	float iso_value_histogram_max;
 	float gradient_histogram_max;
 	float gradient_heatmap_max;
 	float gradient_heatmap_min;
+	
+	bool enable_transfer_function = false;
+	TransferFunctionWidget tf_widget;
+	GLuint transfer_function_texture;
 };
 
 int main() {
