@@ -197,7 +197,7 @@ public:
 					}
 					ImGui::EndCombo();
 				}
-				ImGui::SliderFloat("Gradient Threshold", &max_gradient, 1.0f, 250.0f);
+				ImGui::SliderFloat("Gradient Threshold", &max_gradient, 1.0f, 400.0f);
 				if (ImGui::Button("Loading Files")) {
 					if (file_names_raw.empty() || file_names_inf.empty() || current_item_raw == "Please select a file..." || current_item_inf == "Please select a file..." || current_item_raw == "none" || current_item_inf == "none") {
 						Nexus::Logger::Message(Nexus::LOG_ERROR, "Please select a folder path and choose a volume data first!");
@@ -663,7 +663,7 @@ private:
 	std::vector<char*> gradient_heatmap_labely;
 	float iso_value = 80.0;
 	float iso_value_shader = 80.0;
-	float max_gradient = 100.0f;
+	float max_gradient = 300.0f;
 	float iso_value_histogram_max;
 	float gradient_histogram_max;
 	float gradient_heatmap_max;
