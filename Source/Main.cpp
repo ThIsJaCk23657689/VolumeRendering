@@ -30,6 +30,8 @@ public:
 		Settings.EnableDebugCallback = true;
 		Settings.EnableFullScreen = false;
 
+
+		
 		Settings.EnableGhostMode = false;
 		Settings.ShowOriginAnd3Axes = false;
 
