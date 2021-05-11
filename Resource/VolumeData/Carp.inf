@@ -1,0 +1,4 @@
+raw-file=Carp.raw
+resolution=256x256x256
+sample-type=unsigned char
+ratio=1:0.5:1

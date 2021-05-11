@@ -164,9 +164,7 @@ public:
 					ImGui::TextColored(ImVec4(0.6f, 0.8f, 0.0f, 1.0f), volume_data_folder_path);
 					ImGui::Text("Please try another folder path to load.\n\n");
 					ImGui::Separator();
-					
 
-					
 					if (ImGui::Button("OK", ImVec2(120, 0))) { ImGui::CloseCurrentPopup(); }
 					ImGui::SetItemDefaultFocus();
 					ImGui::EndPopup();
@@ -225,6 +223,12 @@ public:
 				// ImGui::Separator();
 				
 				if (engine->GetIsInitialize()) {
+					if (ImGui::CollapsingHeader("Volume Data Attributes")) {
+						ImGui::BulletText("Resolution: %.2f, %.2f, %.2f", engine->GetResolution().x, engine->GetResolution().y, engine->GetResolution().z);
+						ImGui::BulletText("Ratio: %.2f, %.2f, %.2f", engine->GetRatio().x, engine->GetRatio().y, engine->GetRatio().z);
+						ImGui::BulletText("DataType: %s", engine->GetDataType());
+						ImGui::BulletText("Endian: %s", engine->GetEndian());
+					}
 					if (ImGui::CollapsingHeader("Gradient Histogram")) {
 						ImGui::PlotHistogram("Gradient Histogram", gradient_histogram.data(), gradient_histogram.size(), 0, NULL, 0.0f, gradient_histogram_max, ImVec2(0, 300));
 					}
