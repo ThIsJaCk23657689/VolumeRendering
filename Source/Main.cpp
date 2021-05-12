@@ -30,8 +30,6 @@ public:
 		Settings.EnableDebugCallback = true;
 		Settings.EnableFullScreen = false;
 
-
-		
 		Settings.EnableGhostMode = false;
 		Settings.ShowOriginAnd3Axes = false;
 
@@ -55,6 +53,7 @@ public:
 
 		// Create shader program
 		myShader = std::make_unique<Nexus::Shader>("Shaders/simple_lighting.vert", "Shaders/simple_lighting.frag");
+		rayShader = std::make_unique<Nexus::Shader>("Shaders/ray_casting.vert", "Shaders/ray_casting.frag");
 		normalShader = std::make_unique<Nexus::Shader>("Shaders/normal_visualization.vs", "Shaders/normal_visualization.fs", "Shaders/normal_visualization.gs");
 
 		// Create Camera
@@ -95,21 +94,38 @@ public:
 		}
 
 		if (engine->GetIsInitialize() && engine->GetIsReadyToDraw()) {
-			model->Push();
-			model->Save(glm::translate(model->Top(), glm::vec3(-149 / 2.0f, -208 / 2.0f, -110 / 2.0f)));
-			myShader->SetVec3("objectColor", glm::vec3(0.482352941, 0.68627451, 0.929411765));
-			glActiveTexture(GL_TEXTURE1);
-			glBindTexture(GL_TEXTURE_1D, transfer_function_texture);
-			engine->Draw(myShader.get(), model->Top());
-			myShader->SetVec3("objectColor", glm::vec3(0.929411765, 0.68627451, 0.482352941));
-			if (Settings.NormalVisualize) {
-				normalShader->Use();
-				normalShader->SetMat4("view", view);
-				normalShader->SetMat4("projection", projection);
-				// model->Save(glm::translate(model->Top(), glm::vec3(-RESOLUTION_X / 2.0f, -RESOLUTION_Y / 2.0f, -RESOLUTION_Z / 2.0f)));
-				engine->Draw(normalShader.get(), model->Top());
+			if (engine->GetCurrentRenderMode() == Nexus::RENDER_MODE_RAY_CASTING) {
+				rayShader->Use();
+				rayShader->SetMat4("view", view);
+				rayShader->SetMat4("projection", projection);
+				rayShader->SetVec3("lightPos", Settings.EnableGhostMode ? first_camera->GetPosition() : third_camera->GetPosition());
+				rayShader->SetVec3("viewPos", Settings.EnableGhostMode ? first_camera->GetPosition() : third_camera->GetPosition());
+				rayShader->SetVec3("lightColor", glm::vec3(1.0f, 1.0f, 1.0f));
+				model->Push();
+				model->Save(glm::translate(model->Top(), glm::vec3(-149 / 2.0f, -208 / 2.0f, -110 / 2.0f)));
+				glActiveTexture(GL_TEXTURE0);
+				glBindTexture(GL_TEXTURE_3D, engine->GetVolumeTexture());
+				glActiveTexture(GL_TEXTURE1);
+				glBindTexture(GL_TEXTURE_1D, transfer_function_texture);
+				engine->Draw(rayShader.get(), model->Top());
+				model->Pop();
+			} else {
+				model->Push();
+				model->Save(glm::translate(model->Top(), glm::vec3(-149 / 2.0f, -208 / 2.0f, -110 / 2.0f)));
+				myShader->SetVec3("objectColor", glm::vec3(0.482352941, 0.68627451, 0.929411765));
+				glActiveTexture(GL_TEXTURE1);
+				glBindTexture(GL_TEXTURE_1D, transfer_function_texture);
+				engine->Draw(myShader.get(), model->Top());
+				myShader->SetVec3("objectColor", glm::vec3(0.929411765, 0.68627451, 0.482352941));
+				if (Settings.NormalVisualize) {
+					normalShader->Use();
+					normalShader->SetMat4("view", view);
+					normalShader->SetMat4("projection", projection);
+					// model->Save(glm::translate(model->Top(), glm::vec3(-RESOLUTION_X / 2.0f, -RESOLUTION_Y / 2.0f, -RESOLUTION_Z / 2.0f)));
+					engine->Draw(normalShader.get(), model->Top());
+				}
+				model->Pop();
 			}
-			model->Pop();
 		}
 
 		// ImGui::ShowDemoWindow();
@@ -283,8 +299,8 @@ public:
 
 						engine->GenerateGradientHeatMap();
 						gradient_heatmap = engine->GetGradientHeatmap();
-						gradient_heatmap_max = *std::max_element(gradient_heatmap.cbegin(), gradient_heatmap.cend());
-						gradient_heatmap_min = *std::min_element(gradient_heatmap.cbegin(), gradient_heatmap.cend());
+						gradient_heatmap_max = 140.0f;
+						gradient_heatmap_min = 0.0f;
 					}
 					ImGui::Spacing();
 					ImGui::Separator();
@@ -641,6 +657,7 @@ public:
 	
 private:
 	std::unique_ptr<Nexus::Shader> myShader = nullptr;
+	std::unique_ptr<Nexus::Shader> rayShader = nullptr;
 	std::unique_ptr<Nexus::Shader> normalShader = nullptr;
 
 	std::unique_ptr<Nexus::FirstPersonCamera> first_camera = nullptr;
