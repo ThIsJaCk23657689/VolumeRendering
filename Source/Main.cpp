@@ -102,7 +102,7 @@ public:
 				rayShader->SetVec3("viewPos", Settings.EnableGhostMode ? first_camera->GetPosition() : third_camera->GetPosition());
 				rayShader->SetVec3("lightColor", glm::vec3(1.0f, 1.0f, 1.0f));
 				model->Push();
-				model->Save(glm::translate(model->Top(), glm::vec3(-149 / 2.0f, -208 / 2.0f, -110 / 2.0f)));
+				//model->Save(glm::translate(model->Top(), glm::vec3(-149 / 2.0f, -208 / 2.0f, -110 / 2.0f)));
 				glActiveTexture(GL_TEXTURE0);
 				glBindTexture(GL_TEXTURE_3D, engine->GetVolumeTexture());
 				glActiveTexture(GL_TEXTURE1);
