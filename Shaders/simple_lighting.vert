@@ -11,10 +11,11 @@ out VS_OUT {
 uniform mat4 model;
 uniform mat4 view;
 uniform mat4 projection;
+uniform mat3 normalModel;
 
 void main() {
 	vs_out.NaviePos = aPosition;
 	vs_out.FragPos =  vec3(model * vec4(aPosition, 1.0));
-	vs_out.Normal = mat3(transpose(inverse(model))) * aNormal;
+	vs_out.Normal = normalModel * aNormal;
 	gl_Position = projection * view * vec4(vs_out.FragPos, 1.0);
 }

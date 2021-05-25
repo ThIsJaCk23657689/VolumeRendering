@@ -4,6 +4,11 @@ cmake_minimum_required(VERSION 3.14.5)
 set(MY_PROJECT "VolumeRendering")
 set(MY_LIBRARY "Nexus")
 
+# Enable C++ 17
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
 project (${MY_PROJECT} LANGUAGES CXX C)
 
 add_subdirectory(External/Nexus)

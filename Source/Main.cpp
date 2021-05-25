@@ -7,6 +7,8 @@
 #include "MatrixStack.h"
 #include "IsoSurface.h"
 #include "Cube.h"
+#include "Light.h"
+#include "NDCQuad.h"
 #include "Sphere.h"
 
 #include <stb_image.h>
@@ -26,12 +28,14 @@ public:
 	VolumeRendering() {
 		Settings.Width = 800;
 		Settings.Height = 600;
-		Settings.WindowTitle = "Scientific Visualization | Project #2: Transfer Function Design";
+		Settings.WindowTitle = "Scientific Visualization | Project #3: Volume Rendering Using GPU";
 		Settings.EnableDebugCallback = true;
 		Settings.EnableFullScreen = false;
 
 		Settings.EnableGhostMode = false;
 		Settings.ShowOriginAnd3Axes = false;
+		Settings.EnableFaceCulling = true;
+		Settings.CullingTypeStr = "Front Face";
 
 		// Projection Settings Initalize
 		ProjectionSettings.IsPerspective = true;
@@ -55,6 +59,8 @@ public:
 		myShader = std::make_unique<Nexus::Shader>("Shaders/simple_lighting.vert", "Shaders/simple_lighting.frag");
 		rayShader = std::make_unique<Nexus::Shader>("Shaders/ray_casting.vert", "Shaders/ray_casting.frag");
 		normalShader = std::make_unique<Nexus::Shader>("Shaders/normal_visualization.vs", "Shaders/normal_visualization.fs", "Shaders/normal_visualization.gs");
+		entryExitShader = std::make_unique<Nexus::Shader>("Shaders/entry_exit_points.vert", "Shaders/entry_exit_points.frag");
+		screenShader = std::make_unique<Nexus::Shader>("Shaders/framebuffer_screen.vert", "Shaders/framebuffer_screen.frag");
 
 		// Create Camera
 		first_camera = std::make_unique<Nexus::FirstPersonCamera>(glm::vec3(0.0f, 0.0f, 430.0f));
@@ -67,9 +73,40 @@ public:
 		engine = std::make_unique<Nexus::IsoSurface>();
 		
 		cube = std::make_unique<Nexus::Cube>();
+		quad = std::make_unique<Nexus::NDCQuad>();
 		sphere = std::make_unique<Nexus::Sphere>();
 
+		// Create a transfunction (1D Texture)
 		transfer_function_texture = GetTFTexture(tf_widget);
+
+		// Create a point light
+		point_light = std::make_unique<Nexus::PointLight>(glm::vec3(-7.1f, 14.2f, -1.4f), false);
+
+		// Create entry and exit point (texture 2D)
+		entry_points = std::make_unique<Nexus::Texture2D>(Settings.Width, Settings.Height, GL_RGBA16, GL_RGB, GL_UNSIGNED_SHORT);
+		entry_points->SetFilterParams(GL_LINEAR, GL_LINEAR);
+		entry_points->SetWrappingParams(GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE);
+		
+		exit_points = std::make_unique<Nexus::Texture2D>(Settings.Width, Settings.Height, GL_RGBA16, GL_RGB, GL_UNSIGNED_SHORT);
+		exit_points->SetFilterParams(GL_LINEAR, GL_LINEAR);
+		exit_points->SetWrappingParams(GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE);
+
+		// Create Framebuffer and bind the texture
+		glGenFramebuffers(1, &framebuffer);
+		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, entry_points->ID, 0);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, exit_points->ID, 0);
+
+		glGenRenderbuffers(1, &rbo);
+		glBindRenderbuffer(GL_RENDERBUFFER, rbo);
+		glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, Settings.Width, Settings.Height);
+		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rbo);
+		if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+			// error
+			std::cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << std::endl;
+		}
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		// glDeleteFramebuffers(1, &framebuffer);
 	}
 
 	void Update(Nexus::DisplayMode monitor_type) override {
@@ -78,30 +115,68 @@ public:
 		SetProjectionMatrix(Nexus::DISPLAY_MODE_DEFAULT);
 		SetViewport(Nexus::DISPLAY_MODE_DEFAULT);
 
+		if (Settings.EnableFaceCulling) {
+			// CW => Clockwise 順時針方向為正向面 
+			glEnable(GL_CULL_FACE);
+			glFrontFace(GL_CW);
+			if (Settings.CullingTypeStr == "Back Face") {
+				glCullFace(GL_BACK);
+			} else {
+				glCullFace(GL_FRONT);
+			}
+		} else {
+			glDisable(GL_CULL_FACE);
+		}
+
+		// Lighting Setting
+		point_light->SetPosition(Settings.EnableGhostMode ? first_camera->GetPosition() : third_camera->GetPosition());
+
+		// Shader Init
 		myShader->Use();
-		myShader->SetBool("is_volume", false);
-		myShader->SetBool("enable_transfer_function", enable_transfer_function);
-		myShader->SetFloat("iso_value", iso_value_shader);
 		myShader->SetMat4("view", view);
 		myShader->SetMat4("projection", projection);
-		myShader->SetVec3("lightPos", Settings.EnableGhostMode? first_camera->GetPosition() : third_camera->GetPosition());
 		myShader->SetVec3("viewPos", Settings.EnableGhostMode ? first_camera->GetPosition() : third_camera->GetPosition());
-		myShader->SetVec3("lightColor", glm::vec3(1.0f, 1.0f, 1.0f));
+		myShader->SetVec3("lightPos", point_light->GetPosition());
+		myShader->SetVec3("lightColor", point_light->GetDiffuse());
+		myShader->SetFloat("iso_value", iso_value_shader);
+		myShader->SetBool("is_volume", false);
 
 		// ==================== Draw origin and 3 axes ====================
 		if (Settings.ShowOriginAnd3Axes) {
 			this->DrawOriginAnd3Axes(myShader.get());
 		}
 
-		if (engine->GetIsInitialize() && engine->GetIsReadyToDraw()) {
-			if (engine->GetCurrentRenderMode() == Nexus::RENDER_MODE_RAY_CASTING) {
-				rayShader->Use();
-				rayShader->SetMat4("view", view);
-				rayShader->SetMat4("projection", projection);
-				rayShader->SetVec3("lightPos", Settings.EnableGhostMode ? first_camera->GetPosition() : third_camera->GetPosition());
-				rayShader->SetVec3("viewPos", Settings.EnableGhostMode ? first_camera->GetPosition() : third_camera->GetPosition());
-				rayShader->SetVec3("lightColor", glm::vec3(1.0f, 1.0f, 1.0f));
+		if (engine->GetCurrentRenderMode() == Nexus::RENDER_MODE_ISO_SURFACE) {
+			// Iso Surface
+			if (engine->GetIsInitialize() && engine->GetIsReadyToDraw()) {
 				model->Push();
+				model->Save(glm::translate(model->Top(), engine->GetResolution() * -0.5f));
+				myShader->SetVec3("objectColor", glm::vec3(0.482352941, 0.68627451, 0.929411765));
+				engine->Draw(myShader.get(), model->Top());
+				if (Settings.NormalVisualize) {
+					normalShader->Use();
+					normalShader->SetMat4("view", view);
+					normalShader->SetMat4("projection", projection);
+					engine->Draw(normalShader.get(), model->Top());
+				}
+				model->Pop();
+			}
+		} else if (engine->GetCurrentRenderMode() == Nexus::RENDER_MODE_RAY_CASTING) {
+			// Volume Rendering: Ray Casting
+
+			// Shader Init
+			rayShader->Use();
+			rayShader->SetMat4("view", view);
+			rayShader->SetMat4("projection", projection);
+			rayShader->SetVec3("lightPos", point_light->GetPosition());
+			rayShader->SetVec3("viewPos", Settings.EnableGhostMode ? first_camera->GetPosition() : third_camera->GetPosition());
+			rayShader->SetVec3("lightColor", point_light->GetDiffuse());
+			rayShader->SetVec3("backgroundColor", this->Settings.BackgroundColor);
+			// rayShader->SetFloat("sampling_rate", sampling_rate);
+
+			if (engine->GetIsInitialize() && engine->GetIsReadyToDraw()) {
+				model->Push();
+				model->Save(glm::translate(model->Top(), engine->GetResolution() * -0.5f));
 				//model->Save(glm::translate(model->Top(), glm::vec3(-149 / 2.0f, -208 / 2.0f, -110 / 2.0f)));
 				glActiveTexture(GL_TEXTURE0);
 				glBindTexture(GL_TEXTURE_3D, engine->GetVolumeTexture());
@@ -109,23 +184,87 @@ public:
 				glBindTexture(GL_TEXTURE_1D, transfer_function_texture);
 				engine->Draw(rayShader.get(), model->Top());
 				model->Pop();
-			} else {
+			}
+
+			
+
+			
+
+			/*
+			// Frame buffer binding
+			glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+			glEnable(GL_DEPTH_TEST);
+			glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+			
+			// Shader Init
+			entryExitShader->Use();
+			entryExitShader->SetMat4("view", view);
+			entryExitShader->SetMat4("projection", projection);
+
+			glDrawBuffer(GL_COLOR_ATTACHMENT1);
+			
+			// 設定 DepthFunc 為 GL_GREATER，代表距離比較遠的會蓋過距離比較近的物體。　（視覺上類似Front Face Culling）
+			glDepthFunc(GL_GREATER);
+
+			// 儲存當前的 GL_DEPTH_CLEAR_VALUE 值（這個是預設值 1.0f）
+			float old_depth;
+			glGetFloatv(GL_DEPTH_CLEAR_VALUE, &old_depth);
+			
+			// 設定為 0，如此一來深度值必須大於0(比較遠)才會畫出來，如果設 1.0f 什麼都畫不出來。 （因為GL_GREATER）
+			glClearDepth(0.0f);
+
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+			if (engine->GetIsInitialize() && engine->GetIsReadyToDraw()) {
 				model->Push();
-				model->Save(glm::translate(model->Top(), glm::vec3(-149 / 2.0f, -208 / 2.0f, -110 / 2.0f)));
-				myShader->SetVec3("objectColor", glm::vec3(0.482352941, 0.68627451, 0.929411765));
-				glActiveTexture(GL_TEXTURE1);
-				glBindTexture(GL_TEXTURE_1D, transfer_function_texture);
-				engine->Draw(myShader.get(), model->Top());
-				myShader->SetVec3("objectColor", glm::vec3(0.929411765, 0.68627451, 0.482352941));
-				if (Settings.NormalVisualize) {
-					normalShader->Use();
-					normalShader->SetMat4("view", view);
-					normalShader->SetMat4("projection", projection);
-					// model->Save(glm::translate(model->Top(), glm::vec3(-RESOLUTION_X / 2.0f, -RESOLUTION_Y / 2.0f, -RESOLUTION_Z / 2.0f)));
-					engine->Draw(normalShader.get(), model->Top());
-				}
+				engine->Draw(entryExitShader.get(), model->Top());
 				model->Pop();
 			}
+
+			glDrawBuffer(GL_COLOR_ATTACHMENT0);
+			
+			// 設定 DepthFunc 為 GL_LESS，代表距離比較近的會蓋過距離比較遠的物體。
+			glDepthFunc(GL_LESS);
+
+			// 將 Depth Buffer 的預設值設回原本的預設 （也就是 1.0f） （因為現在是 GL_LESS，必須要小於1.0f才畫得出東西來）
+			glClearDepth(old_depth);
+			
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+			if (engine->GetIsInitialize() && engine->GetIsReadyToDraw()) {
+				model->Push();
+				engine->Draw(entryExitShader.get(), model->Top());
+				model->Pop();
+			}
+
+			screenShader->Use();
+			screenShader->SetInt("entry_points_sampler", 0);
+			screenShader->SetInt("exit_points_sampler", 1);
+			screenShader->SetInt("volume", 2);
+			screenShader->SetInt("transfer_function", 3);
+			screenShader->SetVec2("screen_size", glm::vec2(Settings.Width, Settings.Height));
+			screenShader->SetVec3("volume_resoultion", engine->GetResolution());
+			screenShader->SetFloat("sampling_rate", sampling_rate);
+			screenShader->SetVec3("viewPos", Settings.EnableGhostMode ? first_camera->GetPosition() : third_camera->GetPosition());
+			screenShader->SetVec3("lightPos", Settings.EnableGhostMode ? first_camera->GetPosition() : third_camera->GetPosition());
+			screenShader->SetVec3("lightColor", glm::vec3(1.0f, 1.0f, 1.0f));
+			
+			glBindFramebuffer(GL_FRAMEBUFFER, 0);
+			glDisable(GL_DEPTH_TEST);
+			glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, entry_points->ID);
+			glActiveTexture(GL_TEXTURE1);
+			glBindTexture(GL_TEXTURE_2D, exit_points->ID);
+
+			glActiveTexture(GL_TEXTURE2);
+			glBindTexture(GL_TEXTURE_3D, engine->GetVolumeTexture());
+			glActiveTexture(GL_TEXTURE3);
+			glBindTexture(GL_TEXTURE_1D, transfer_function_texture);
+			
+			// Draw screen quad
+			quad->Draw(screenShader.get());
+			*/
 		}
 
 		// ImGui::ShowDemoWindow();
@@ -143,7 +282,7 @@ public:
 		if (ImGui::Button("Export")) {
 			Nexus::FileLoader::OutputTransferFunction("Resource/Exports/transfer.txt", tf_widget.get_colormapf(), engine.get());
 		}
-		ImGui::Checkbox("Enable Transfer Function", &enable_transfer_function);
+		// ImGui::Checkbox("Enable Transfer Function", &enable_transfer_function);
 		tf_widget.draw_ui();
 		glDeleteTextures(1, &transfer_function_texture);
 		transfer_function_texture = GetTFTexture(tf_widget);
@@ -174,7 +313,6 @@ public:
 					}
 				}
 				
-
 				if (ImGui::BeginPopupModal("Error##01", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
 					ImGui::Text("There is no any volume data (.raw and .inf) files in this folder:\n");
 					ImGui::TextColored(ImVec4(0.6f, 0.8f, 0.0f, 1.0f), volume_data_folder_path);
@@ -236,7 +374,6 @@ public:
 					}
 				}
 				ImGui::Spacing();
-				// ImGui::Separator();
 				
 				if (engine->GetIsInitialize()) {
 					if (ImGui::CollapsingHeader("Volume Data Attributes")) {
@@ -334,18 +471,31 @@ public:
 		
 		ImGui::Begin("General Setting");
 		if (ImGui::BeginTabBar("GeneralTabBar", tab_bar_flags)) {
+
 			if (ImGui::BeginTabItem("Camera")) {
 				ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 				if (Settings.EnableGhostMode) {
-					first_camera->ShowDebugUI("Person Person Camera");
+					first_camera->ShowDebugUI("First Person Camera");
 				} else {
 					third_camera->ShowDebugUI("Third Person Camera");
-					ImGui::BulletText("Distance: %.2f", third_camera->GetDistance());
+					ImGui::Text("Distance: %.2f", third_camera->GetDistance());
+				}
+				if (ImGui::Button("Reset Position")) {
+					if (Settings.EnableGhostMode) {
+						first_camera->SetPosition(glm::vec3(0.0f, 0.0f, 10.0f));
+						first_camera->SetPitch(0.0f);
+						first_camera->SetYaw(0.0f);
+					} else {
+						third_camera->SetPosition(glm::vec3(0.0f, 0.0f, 10.0f));
+						third_camera->SetPitch(0.0f);
+						third_camera->SetYaw(0.0f);
+					}
+					
 				}
 				ImGui::EndTabItem();
 			}
-			if (ImGui::BeginTabItem("Projection")) {
 
+			if (ImGui::BeginTabItem("Projection")) {
 				ImGui::TextColored(ImVec4(1.0f, 0.5f, 1.0f, 1.0f), (ProjectionSettings.IsPerspective) ? "Perspective Projection" : "Orthogonal Projection");
 				ImGui::Text("Parameters");
 				ImGui::BulletText("FoV = %.2f deg, Aspect = %.2f", Settings.EnableGhostMode? first_camera->GetFOV() : third_camera->GetFOV(), ProjectionSettings.Aspect);
@@ -354,8 +504,7 @@ public:
 				}
 				// ImGui::BulletText("left: %.2f, right: %.2f ", ProjectionSettings.ClippingLeft, ProjectionSettings.ClippingTop);
 				// ImGui::BulletText("bottom: %.2f, top: %.2f ", ProjectionSettings.ClippingBottom, ProjectionSettings.ClippingTop);
-				ImGui::SliderFloat("Near", &ProjectionSettings.ClippingNear, 0.001f, 10.0f);
-				ImGui::SliderFloat("Far", &ProjectionSettings.ClippingFar, 10.0f, 1000.0f);
+				ImGui::DragFloatRange2("Near & Far", &ProjectionSettings.ClippingNear, &ProjectionSettings.ClippingFar, 0.1f, 0.1f, 500.0f);
 				ImGui::Spacing();
 
 				if (ImGui::TreeNode("Projection Matrix")) {
@@ -376,55 +525,56 @@ public:
 					ImGui::TreePop();
 				}
 				ImGui::Spacing();
-				
 				/*
 				if (ImGui::TreeNode("View Volume Vertices")) {
-					ImGui::BulletText("rtnp: (%.2f, %.2f, %.2f)", nearPlaneVertex[0].x, nearPlaneVertex[0].y, nearPlaneVertex[0].z);
-					ImGui::BulletText("ltnp: (%.2f, %.2f, %.2f)", nearPlaneVertex[1].x, nearPlaneVertex[1].y, nearPlaneVertex[1].z);
-					ImGui::BulletText("rbnp: (%.2f, %.2f, %.2f)", nearPlaneVertex[2].x, nearPlaneVertex[2].y, nearPlaneVertex[2].z);
-					ImGui::BulletText("lbnp: (%.2f, %.2f, %.2f)", nearPlaneVertex[3].x, nearPlaneVertex[3].y, nearPlaneVertex[3].z);
-					ImGui::BulletText("rtfp: (%.2f, %.2f, %.2f)", farPlaneVertex[0].x, farPlaneVertex[0].y, farPlaneVertex[0].z);
-					ImGui::BulletText("ltfp: (%.2f, %.2f, %.2f)", farPlaneVertex[1].x, farPlaneVertex[1].y, farPlaneVertex[1].z);
-					ImGui::BulletText("rbfp: (%.2f, %.2f, %.2f)", farPlaneVertex[2].x, farPlaneVertex[2].y, farPlaneVertex[2].z);
-					ImGui::BulletText("lbfp: (%.2f, %.2f, %.2f)", farPlaneVertex[3].x, farPlaneVertex[3].y, farPlaneVertex[3].z);
+					view_volume->ShowViewVolumeVerticesImGUI();
 					ImGui::TreePop();
 				}
+				ImGui::Spacing();
 
+				if (ImGui::TreeNode("View Volume Normals")) {
+					view_volume->ShowViewVolumeNormalsImGUI();
+					ImGui::TreePop();
+				}
 				ImGui::Spacing();
 				*/
 				ImGui::EndTabItem();
 			}
+
+			if (ImGui::BeginTabItem("Light Setting")) {
+				// 新增 Light Position
+				ImGui::SliderFloat3("Light Color", point_light->GetDiffusePointer(), 0.0f, 1.0f);
+
+				ImGui::EndTabItem();
+			}
+			
 			if (ImGui::BeginTabItem("Illustration")) {
-
-				// ImGui::Text("Current Screen: %d", currentScreen + 1);
-				ImGui::Text("Ghost Mode: %s", Settings.EnableGhostMode ? "True" : "false");
-				// ImGui::Text("Projection Mode: %s", isPerspective ? "Perspective" : "Orthogonal");
-				ImGui::Text("Showing Axes: %s", Settings.ShowOriginAnd3Axes ? "True" : "false");
+				// ImGui::Text("Current Screen: %d", Settings.CurrentDisplyMode);
 				// ImGui::Text("Full Screen:  %s", isfullscreen ? "True" : "false");
-				// ImGui::SliderFloat("zoom", &distanceOrthoCamera, 5, 25);
-				ImGui::Spacing();
+				ImGui::Text("Showing Axes: %s", Settings.ShowOriginAnd3Axes ? "True" : "false");
 
-				if (ImGui::TreeNode("General")) {
-					ImGui::BulletText("Press G to switch Ghost Mode");
-					ImGui::BulletText("Press X to show / hide the axes");
-					ImGui::BulletText("Press Y to switch the projection");
-					ImGui::BulletText("Press 1~5 to switch the screen");
-					ImGui::BulletText("Press F11 to Full Screen");
-					ImGui::BulletText("Press ESC to close the program");
-					ImGui::TreePop();
-				}
 				ImGui::Spacing();
-
-				if (ImGui::TreeNode("Ghost Camera Illustration")) {
-					ImGui::BulletText("WSAD to move camera");
-					ImGui::BulletText("Hold mouse right button to rotate");
-					ImGui::BulletText("Press Left Shift to speed up");
-					ImGui::TreePop();
+				ImGui::Checkbox("Face Culling", &Settings.EnableFaceCulling);
+				if (ImGui::BeginCombo("Culling Type", Settings.CullingTypeStr.c_str())) {
+					for (int n = 0; n < Settings.CullingTypes.size(); n++) {
+						bool is_selected = (Settings.CullingTypeStr == Settings.CullingTypes[n]);
+						if (ImGui::Selectable(Settings.CullingTypes[n].c_str(), is_selected)) {
+							Settings.CullingTypeStr = Settings.CullingTypes[n];
+						}
+						if (is_selected) {
+							ImGui::SetItemDefaultFocus();
+						}
+					}
+					ImGui::EndCombo();
 				}
+				
+				
+				ImGui::SliderFloat3("Background Color", glm::value_ptr(this->Settings.BackgroundColor), 0.0f, 1.0f);
 				ImGui::Spacing();
 
 				ImGui::EndTabItem();
 			}
+
 			ImGui::EndTabBar();
 		}
 		ImGui::Spacing();
@@ -645,7 +795,6 @@ public:
 		glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
 		
 		// Upload it to the GPU
 		glTexImage1D(GL_TEXTURE_1D, 0, GL_RGBA, texel_count, 0, GL_RGBA, GL_FLOAT, colormap.data());
@@ -659,6 +808,8 @@ private:
 	std::unique_ptr<Nexus::Shader> myShader = nullptr;
 	std::unique_ptr<Nexus::Shader> rayShader = nullptr;
 	std::unique_ptr<Nexus::Shader> normalShader = nullptr;
+	std::unique_ptr<Nexus::Shader> entryExitShader = nullptr;
+	std::unique_ptr<Nexus::Shader> screenShader = nullptr;
 
 	std::unique_ptr<Nexus::FirstPersonCamera> first_camera = nullptr;
 	std::unique_ptr<Nexus::ThirdPersonCamera> third_camera = nullptr;
@@ -668,9 +819,12 @@ private:
 	glm::mat4 projection = glm::mat4(1.0f);
 
 	std::unique_ptr<Nexus::Cube> cube = nullptr;
+	std::unique_ptr<Nexus::NDCQuad> quad = nullptr;
 	std::unique_ptr<Nexus::Sphere> sphere = nullptr;
 
 	std::unique_ptr<Nexus::IsoSurface> engine = nullptr;
+
+	std::unique_ptr<Nexus::PointLight> point_light;
 
 	bool is_loaded_file = false;
 	char volume_data_folder_path[128] = "Resource/VolumeData";
@@ -692,9 +846,14 @@ private:
 	float gradient_heatmap_max;
 	float gradient_heatmap_min;
 	
-	bool enable_transfer_function = false;
+	// bool enable_transfer_function = false;
 	TransferFunctionWidget tf_widget;
 	GLuint transfer_function_texture;
+
+	float sampling_rate = 2.0f;
+	GLuint framebuffer, rbo;
+	std::unique_ptr<Nexus::Texture2D> entry_points = nullptr;
+	std::unique_ptr<Nexus::Texture2D> exit_points = nullptr;
 };
 
 int main() {
