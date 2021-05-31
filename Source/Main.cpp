@@ -21,7 +21,7 @@
 #include <algorithm>
 #include <random>
 #include <transfer_function_widget.h>
-
+#include <transfer_function.h>
 
 class VolumeRendering final : public Nexus::Application {
 public:
@@ -59,7 +59,6 @@ public:
 		myShader = std::make_unique<Nexus::Shader>("Shaders/simple_lighting.vert", "Shaders/simple_lighting.frag");
 		rayShader = std::make_unique<Nexus::Shader>("Shaders/ray_casting.vert", "Shaders/ray_casting.frag");
 		normalShader = std::make_unique<Nexus::Shader>("Shaders/normal_visualization.vs", "Shaders/normal_visualization.fs", "Shaders/normal_visualization.gs");
-		entryExitShader = std::make_unique<Nexus::Shader>("Shaders/entry_exit_points.vert", "Shaders/entry_exit_points.frag");
 		screenShader = std::make_unique<Nexus::Shader>("Shaders/framebuffer_screen.vert", "Shaders/framebuffer_screen.frag");
 
 		// Create Camera
@@ -80,27 +79,22 @@ public:
 		transfer_function_texture = GetTFTexture(tf_widget);
 
 		// Create a point light
-		point_light = std::make_unique<Nexus::PointLight>(glm::vec3(-7.1f, 14.2f, -1.4f), false);
+		point_light = std::make_unique<Nexus::PointLight>(glm::vec3(0.0f, 0.0f, 0.0f), true);
 
-		// Create entry and exit point (texture 2D)
-		entry_points = std::make_unique<Nexus::Texture2D>(Settings.Width, Settings.Height, GL_RGBA16, GL_RGB, GL_UNSIGNED_SHORT);
-		entry_points->SetFilterParams(GL_LINEAR, GL_LINEAR);
-		entry_points->SetWrappingParams(GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE);
-		
-		exit_points = std::make_unique<Nexus::Texture2D>(Settings.Width, Settings.Height, GL_RGBA16, GL_RGB, GL_UNSIGNED_SHORT);
-		exit_points->SetFilterParams(GL_LINEAR, GL_LINEAR);
-		exit_points->SetWrappingParams(GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE);
+		// Create a texture color buffer (texture 2D)
+		texture_color_buffer = std::make_unique<Nexus::Texture2D>(Settings.Width, Settings.Height, GL_RGB, GL_RGB, GL_UNSIGNED_BYTE);
+		texture_color_buffer->SetFilterParams(GL_LINEAR, GL_LINEAR);
+		texture_color_buffer->SetWrappingParams(GL_CLAMP_TO_EDGE, GL_CLAMP_TO_EDGE);
 
 		// Create Framebuffer and bind the texture
 		glGenFramebuffers(1, &framebuffer);
 		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, entry_points->ID, 0);
-		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, exit_points->ID, 0);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture_color_buffer->ID, 0);
 
 		glGenRenderbuffers(1, &rbo);
 		glBindRenderbuffer(GL_RENDERBUFFER, rbo);
-		glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, Settings.Width, Settings.Height);
-		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rbo);
+		glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, Settings.Width, Settings.Height);
+		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
 		if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
 			// error
 			std::cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << std::endl;
@@ -138,7 +132,7 @@ public:
 		myShader->SetVec3("viewPos", Settings.EnableGhostMode ? first_camera->GetPosition() : third_camera->GetPosition());
 		myShader->SetVec3("lightPos", point_light->GetPosition());
 		myShader->SetVec3("lightColor", point_light->GetDiffuse());
-		myShader->SetFloat("iso_value", iso_value_shader);
+		myShader->SetFloat("iso_value", iso_value);
 		myShader->SetBool("is_volume", false);
 
 		// ==================== Draw origin and 3 axes ====================
@@ -172,7 +166,9 @@ public:
 			rayShader->SetVec3("viewPos", Settings.EnableGhostMode ? first_camera->GetPosition() : third_camera->GetPosition());
 			rayShader->SetVec3("lightColor", point_light->GetDiffuse());
 			rayShader->SetVec3("backgroundColor", this->Settings.BackgroundColor);
-			// rayShader->SetFloat("sampling_rate", sampling_rate);
+			rayShader->SetFloat("sample_rate", sample_rate);
+			rayShader->SetBool("useNormalColor", use_normal_color);
+			rayShader->SetBool("useLighting", use_lighting);
 
 			if (engine->GetIsInitialize() && engine->GetIsReadyToDraw()) {
 				model->Push();
@@ -269,7 +265,7 @@ public:
 
 		// ImGui::ShowDemoWindow();
 		// ImPlot::ShowDemoWindow();
-		// ImGui::ShowBezierDemo();
+		ImGui::ShowBezierDemo();
 	}
 
 	void ShowDebugUI() override {
@@ -277,16 +273,23 @@ public:
 		ImGuiTabBarFlags tab_bar_flags = ImGuiBackendFlags_None;
 		ImVec2 center = ImGui::GetMainViewport()->GetCenter();
 		ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-		
-		ImGui::Begin("Transfer Function");
-		if (ImGui::Button("Export")) {
-			Nexus::FileLoader::OutputTransferFunction("Resource/Exports/transfer.txt", tf_widget.get_colormapf(), engine.get());
-		}
-		// ImGui::Checkbox("Enable Transfer Function", &enable_transfer_function);
-		tf_widget.draw_ui();
-		glDeleteTextures(1, &transfer_function_texture);
-		transfer_function_texture = GetTFTexture(tf_widget);
+
+		ImGui::Begin("Transfer Function Example");
+		tf.ShowUI();
 		ImGui::End();
+		
+		if (engine->GetCurrentRenderMode() == Nexus::RENDER_MODE_RAY_CASTING) {
+			// 使用 Ray Casting 才會生成 Transfer Function
+			ImGui::Begin("Transfer Function");
+			if (ImGui::Button("Export")) {
+				Nexus::FileLoader::OutputTransferFunction("Resource/Exports/transfer.txt", tf_widget.get_colormapf(), engine.get());
+			}
+			tf_widget.draw_ui();
+			glDeleteTextures(1, &transfer_function_texture);
+			transfer_function_texture = GetTFTexture(tf_widget);
+			ImGui::End();
+		}
+
 		
 		ImGui::Begin("Volume Control Center");
 		if (ImGui::BeginTabBar("VolumeTabBar", tab_bar_flags)) {
@@ -369,13 +372,25 @@ public:
 						gradient_heatmap = engine->GetGradientHeatmap();
 						gradient_heatmap_max = 140.0f;
 						gradient_heatmap_min = 0.0f;
-						gradient_heatmap_labelx = engine->GetGradientHeatmapAxisLabels(true);
-						gradient_heatmap_labely = engine->GetGradientHeatmapAxisLabels(false);
+						
+						engine->GetGradientHeatmapAxisLabels(gradient_heatmap_labelx_string, true);
+						engine->GetGradientHeatmapAxisLabels(gradient_heatmap_labely_string, false);
+
+						gradient_heatmap_labelx.clear();
+						for (int i = 0; i < gradient_heatmap_labelx_string.size(); i++) {
+							gradient_heatmap_labelx.push_back(gradient_heatmap_labelx_string[i].c_str());
+						}
+						gradient_heatmap_labely.clear();
+						for (int i = gradient_heatmap_labely_string.size() - 1; i >=0; i--) {
+							gradient_heatmap_labely.push_back(gradient_heatmap_labely_string[i].c_str());
+						}
+						
 					}
 				}
 				ImGui::Spacing();
 				
 				if (engine->GetIsInitialize()) {
+					// 顯示所讀取的 raw 和 inf 資料
 					if (ImGui::CollapsingHeader("Volume Data Attributes")) {
 						ImGui::BulletText("Resolution: %.2f, %.2f, %.2f", engine->GetResolution().x, engine->GetResolution().y, engine->GetResolution().z);
 						ImGui::BulletText("Ratio: %.2f, %.2f, %.2f", engine->GetRatio().x, engine->GetRatio().y, engine->GetRatio().z);
@@ -397,6 +412,8 @@ public:
 						ImGui::SetNextItemWidth(512);
 						ImGui::DragFloatRange2("Min / Max", &gradient_heatmap_min, &gradient_heatmap_max, 10.0f, 0, 20000);
 
+
+						
 						static ImPlotAxisFlags axes_flags = ImPlotAxisFlags_Lock | ImPlotAxisFlags_NoGridLines | ImPlotAxisFlags_NoTickMarks;
 						ImPlot::PushColormap(map);
 						ImPlot::SetNextPlotTicksX(0, 1, 5, gradient_heatmap_labelx.data());
@@ -420,8 +437,6 @@ public:
 					ImGui::EndPopup();
 				}
 
-				// 顯示所讀取的 raw 和 inf 資料
-
 				ImGui::EndTabItem();
 			}
 
@@ -441,24 +456,66 @@ public:
 					}
 					ImGui::Spacing();
 					ImGui::Separator();
-					ImGui::SliderFloat("Iso Value", &iso_value, 0, 255);
-					if (ImGui::Button("Generate")) {
-						if (engine->GetIsInitialize()) {
-							engine->ConvertToPolygon(iso_value);
-							engine->Debug();
-							iso_value_shader = iso_value;
-						} else {
-							Nexus::Logger::Message(Nexus::LOG_ERROR, "YOU MUST LOAD THE VOLUME DATA FIRST and COMPUTE THESE ISO SURFACE VERTICES.");
+
+					if (ImGui::BeginCombo("Render Mode", current_render_mode.c_str())) {
+						for (int n = 0; n < render_modes.size(); n++) {
+							bool is_selected = (current_render_mode == render_modes[n]);
+							if (ImGui::Selectable(render_modes[n].c_str(), is_selected)) {
+								current_render_mode = render_modes[n];
+								switch (n) {
+								case 0:
+									engine->SetCurrentRenderMode(Nexus::RENDER_MODE_ISO_SURFACE);
+									break;
+								case 1:
+									engine->SetCurrentRenderMode(Nexus::RENDER_MODE_RAY_CASTING);
+									break;
+								}
+							}
+							if (is_selected) {
+								ImGui::SetItemDefaultFocus();
+							}
+						}
+						ImGui::EndCombo();
+					}
+					ImGui::Spacing();
+					ImGui::Separator();
+
+					if (engine->GetCurrentRenderMode() == Nexus::RENDER_MODE_ISO_SURFACE) {
+						ImGui::SliderFloat("Iso Value", &iso_value, 0, 255);
+						if (ImGui::Button("Generate")) {
+							if (engine->GetIsInitialize()) {
+								engine->SetIsoValue(iso_value);
+								engine->ConvertToPolygon();
+								engine->Debug();
+								// iso_value_shader = iso_value;
+							} else {
+								Nexus::Logger::Message(Nexus::LOG_ERROR, "YOU MUST LOAD THE VOLUME DATA FIRST and COMPUTE THESE ISO SURFACE VERTICES.");
+							}
+						}
+						ImGui::Spacing();
+						ImGui::Separator();
+						ImGui::Checkbox("Normal Visualize", &Settings.NormalVisualize);
+						ImGui::SameLine();
+						ImGui::Checkbox("Wire Frame Mode", engine->WireFrameModeHelper());
+					} else if (engine->GetCurrentRenderMode() == Nexus::RENDER_MODE_RAY_CASTING) {
+						ImGui::SliderFloat("Sample Rate", &sample_rate, 0.01, 1);
+						ImGui::Checkbox("Normal Color", &use_normal_color);
+						ImGui::Checkbox("Lighting", &use_lighting);
+						if (ImGui::Button("Generate")) {
+							if (engine->GetIsInitialize()) {
+								engine->ConvertToPolygon();
+								engine->Debug();
+							} else {
+								Nexus::Logger::Message(Nexus::LOG_ERROR, "YOU MUST LOAD THE VOLUME DATA FIRST and COMPUTE THESE ISO SURFACE VERTICES.");
+							}
 						}
 					}
+					
+					
 				} else {
 					ImGui::TextColored(ImVec4(0.9f, 0.2f, 0.0f, 1.0f), "You must load the volume data first and compute these iso surface vertices.");
 				}
-				ImGui::Spacing();
-				ImGui::Separator();
-				ImGui::Checkbox("Normal Visualize", &Settings.NormalVisualize);
-				ImGui::SameLine();
-				ImGui::Checkbox("Wire Frame Mode", engine->WireFrameModeHelper());
+				
 				
 				
 				ImGui::EndTabItem();
@@ -468,7 +525,6 @@ public:
 		ImGui::Separator();
 		ImGui::End();
 
-		
 		ImGui::Begin("General Setting");
 		if (ImGui::BeginTabBar("GeneralTabBar", tab_bar_flags)) {
 
@@ -808,7 +864,6 @@ private:
 	std::unique_ptr<Nexus::Shader> myShader = nullptr;
 	std::unique_ptr<Nexus::Shader> rayShader = nullptr;
 	std::unique_ptr<Nexus::Shader> normalShader = nullptr;
-	std::unique_ptr<Nexus::Shader> entryExitShader = nullptr;
 	std::unique_ptr<Nexus::Shader> screenShader = nullptr;
 
 	std::unique_ptr<Nexus::FirstPersonCamera> first_camera = nullptr;
@@ -832,28 +887,34 @@ private:
 	std::vector<std::string> file_names_inf;
 	std::string current_item_raw = "none";
 	std::string current_item_inf = "none";
+	std::vector<std::string> render_modes = { "Iso Surface", "Ray Casting" };
+	std::string current_render_mode = "Iso Surface";
 
 	std::vector<float> iso_value_histogram;
 	std::vector<float> gradient_histogram;
 	std::vector<float> gradient_heatmap;
-	std::vector<char*> gradient_heatmap_labelx;
-	std::vector<char*> gradient_heatmap_labely;
+	std::vector<const char*> gradient_heatmap_labelx;
+	std::vector<const char*> gradient_heatmap_labely;
+	std::vector<std::string> gradient_heatmap_labelx_string;
+	std::vector<std::string> gradient_heatmap_labely_string;
 	float iso_value = 80.0;
-	float iso_value_shader = 80.0;
 	float max_gradient = 300.0f;
 	float iso_value_histogram_max;
 	float gradient_histogram_max;
 	float gradient_heatmap_max;
 	float gradient_heatmap_min;
+	float sample_rate = 0.5f;
+	bool use_normal_color = false;
+	bool use_lighting = true;
 	
 	// bool enable_transfer_function = false;
 	TransferFunctionWidget tf_widget;
 	GLuint transfer_function_texture;
 
-	float sampling_rate = 2.0f;
+	TransferFunction tf;
+
 	GLuint framebuffer, rbo;
-	std::unique_ptr<Nexus::Texture2D> entry_points = nullptr;
-	std::unique_ptr<Nexus::Texture2D> exit_points = nullptr;
+	std::unique_ptr<Nexus::Texture2D> texture_color_buffer = nullptr;
 };
 
 int main() {
