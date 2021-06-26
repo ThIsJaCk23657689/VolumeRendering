@@ -1,19 +1,19 @@
-# Scientific Visualization
+# Scientific Visualization - Volume Rendering
 
 ## Future Work
-* Framebuffer ªºÀ³¥Î (Edge detected or Gaussian Blur)
-* Transfer function (UI NeedImprove) => RGB (the knots) (Beizer Curve) [¶}µo¤¤]
-* Square => high frequencies with high opacities; low opacities for other table entries.
+* Post Processing by using framebuffer (edge detected or gaussian blur)
+* Transfer function (UI need improve) => RGB (the knots) (Beizer Curve) [Developing]
+* è®€å– inf æª”æ¡ˆ (æ–°å¢žæ”¯æ´ BigEndian)
 
-## ¤£¬O«Ü«æ¡Abut easy to do...
-* ½Õ¾ãGradientªº»Ö­È¡A¦ý¬Oµo²{Heatmapªº³Ì¤jY­ÈÅÜ°Ê«Ü©_©Ç
+## ä¸æ˜¯å¾ˆæ€¥ï¼Œbut easy to do...
+* èª¿æ•´Gradientçš„é–¥å€¼ï¼Œä½†æ˜¯ç™¼ç¾Heatmapçš„æœ€å¤§Yå€¼è®Šå‹•å¾ˆå¥‡æ€ª
 * Add a point light struct in fragment shader
-* Iso Surface ªºÃC¦â => UI Control
+* Iso Surface çš„é¡è‰² => UI Control
 * the culling plane (one normal vector and a position)
 * Output the transfer function to a disk file (Cloud be more information)
 
 ## If i have some spare time, to do...
-* Åª¨ú inf ÀÉ®× (·s¼W¤ä´© BigEndian)
+* Square => high frequencies with high opacities; low opacities for other table entries.
 * Slicing Method
 * View-Align or Axis-Align
 * Back to front

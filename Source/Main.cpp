@@ -103,14 +103,18 @@ public:
 		// glDeleteFramebuffers(1, &framebuffer);
 	}
 
-	void Update(Nexus::DisplayMode monitor_type) override {
+	void Update() override {
+
+	}
+
+	void Render(Nexus::DisplayMode monitor_type) override {
 
 		SetViewMatrix(Nexus::DISPLAY_MODE_DEFAULT);
 		SetProjectionMatrix(Nexus::DISPLAY_MODE_DEFAULT);
 		SetViewport(Nexus::DISPLAY_MODE_DEFAULT);
 
 		if (Settings.EnableFaceCulling) {
-			// CW => Clockwise ∂∂Æ…∞w§Ë¶V¨∞•ø¶V≠± 
+			// CW => Clockwise È†ÜÊôÇÈáùÊñπÂêëÁÇ∫Ê≠£ÂêëÈù¢ 
 			glEnable(GL_CULL_FACE);
 			glFrontFace(GL_CW);
 			if (Settings.CullingTypeStr == "Back Face") {
@@ -199,14 +203,14 @@ public:
 
 			glDrawBuffer(GL_COLOR_ATTACHMENT1);
 			
-			// ≥]©w DepthFunc ¨∞ GL_GREATER°A•N™Ì∂Z¬˜§Ò∏˚ª∑™∫∑|ª\πL∂Z¬˜§Ò∏˚™Ò™∫™´≈È°C°@°]µ¯ƒ±§W√˛¶¸Front Face Culling°^
+			// Ë®≠ÂÆö DepthFunc ÁÇ∫ GL_GREATERÔºå‰ª£Ë°®Ë∑ùÈõ¢ÊØîËºÉÈÅ†ÁöÑÊúÉËìãÈÅéË∑ùÈõ¢ÊØîËºÉËøëÁöÑÁâ©È´î„ÄÇ„ÄÄÔºàË¶ñË¶∫‰∏äÈ°û‰ººFront Face CullingÔºâ
 			glDepthFunc(GL_GREATER);
 
-			// ¿x¶s∑Ì´e™∫ GL_DEPTH_CLEAR_VALUE ≠»°]≥o≠”¨Oπw≥]≠» 1.0f°^
+			// ÂÑ≤Â≠òÁï∂ÂâçÁöÑ GL_DEPTH_CLEAR_VALUE ÂÄºÔºàÈÄôÂÄãÊòØÈ†êË®≠ÂÄº 1.0fÔºâ
 			float old_depth;
 			glGetFloatv(GL_DEPTH_CLEAR_VALUE, &old_depth);
 			
-			// ≥]©w¨∞ 0°A¶p¶π§@®”≤`´◊≠»•≤∂∑§j©Û0(§Ò∏˚ª∑)§~∑|µe•X®”°A¶p™G≥] 1.0f §∞ªÚ≥£µe§£•X®”°C °]¶]¨∞GL_GREATER°^
+			// Ë®≠ÂÆöÁÇ∫ 0ÔºåÂ¶ÇÊ≠§‰∏Ä‰æÜÊ∑±Â∫¶ÂÄºÂøÖÈ†àÂ§ßÊñº0(ÊØîËºÉÈÅ†)ÊâçÊúÉÁï´Âá∫‰æÜÔºåÂ¶ÇÊûúË®≠ 1.0f ‰ªÄÈ∫ºÈÉΩÁï´‰∏çÂá∫‰æÜ„ÄÇ ÔºàÂõ†ÁÇ∫GL_GREATERÔºâ
 			glClearDepth(0.0f);
 
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -218,10 +222,10 @@ public:
 
 			glDrawBuffer(GL_COLOR_ATTACHMENT0);
 			
-			// ≥]©w DepthFunc ¨∞ GL_LESS°A•N™Ì∂Z¬˜§Ò∏˚™Ò™∫∑|ª\πL∂Z¬˜§Ò∏˚ª∑™∫™´≈È°C
+			// Ë®≠ÂÆö DepthFunc ÁÇ∫ GL_LESSÔºå‰ª£Ë°®Ë∑ùÈõ¢ÊØîËºÉËøëÁöÑÊúÉËìãÈÅéË∑ùÈõ¢ÊØîËºÉÈÅ†ÁöÑÁâ©È´î„ÄÇ
 			glDepthFunc(GL_LESS);
 
-			// ±N Depth Buffer ™∫πw≥]≠»≥]¶^≠Ï•ª™∫πw≥] °]§]¥N¨O 1.0f°^ °]¶]¨∞≤{¶b¨O GL_LESS°A•≤∂∑≠n§p©Û1.0f§~µe±o•X™F¶Ë®”°^
+			// Â∞á Depth Buffer ÁöÑÈ†êË®≠ÂÄºË®≠ÂõûÂéüÊú¨ÁöÑÈ†êË®≠ Ôºà‰πüÂ∞±ÊòØ 1.0fÔºâ ÔºàÂõ†ÁÇ∫ÁèæÂú®ÊòØ GL_LESSÔºåÂøÖÈ†àË¶ÅÂ∞èÊñº1.0fÊâçÁï´ÂæóÂá∫Êù±Ë•ø‰æÜÔºâ
 			glClearDepth(old_depth);
 			
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -274,12 +278,13 @@ public:
 		ImVec2 center = ImGui::GetMainViewport()->GetCenter();
 		ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
 
+
 		ImGui::Begin("Transfer Function Example");
 		tf.ShowUI();
 		ImGui::End();
-		
+
 		if (engine->GetCurrentRenderMode() == Nexus::RENDER_MODE_RAY_CASTING) {
-			// ®œ•Œ Ray Casting §~∑|•Õ¶® Transfer Function
+			// ‰ΩøÁî® Ray Casting ÊâçÊúÉÁîüÊàê Transfer Function
 			ImGui::Begin("Transfer Function");
 			if (ImGui::Button("Export")) {
 				Nexus::FileLoader::OutputTransferFunction("Resource/Exports/transfer.txt", tf_widget.get_colormapf(), engine.get());
@@ -290,240 +295,241 @@ public:
 			ImGui::End();
 		}
 
-		
-		ImGui::Begin("Volume Control Center");
-		if (ImGui::BeginTabBar("VolumeTabBar", tab_bar_flags)) {
-			if (ImGui::BeginTabItem("File Setting")) {
-				ImGui::TextColored(ImVec4(0.9f, 0.8f, 0.0f, 1.0f), "1. Input a folder path which has volume data to load in.");
-				ImGui::InputText("Volume Data Folder", volume_data_folder_path, IM_ARRAYSIZE(volume_data_folder_path));
-				if (ImGui::Button("Loading Folder")) {
-					file_names_raw = Nexus::FileLoader::GetAllFilesNamesWithinFolder(std::string(volume_data_folder_path), "/*.raw");
-					file_names_inf = Nexus::FileLoader::GetAllFilesNamesWithinFolder(std::string(volume_data_folder_path), "/*.inf");
+        ImGui::Begin("Volume Control Center");
+        if (ImGui::BeginTabBar("VolumeTabBar", tab_bar_flags)) {
+            if (ImGui::BeginTabItem("File Setting")) {
+                ImGui::TextColored(ImVec4(0.9f, 0.8f, 0.0f, 1.0f), "1. Input a folder path which has volume data to load in.");
+                ImGui::InputText("Volume Data Folder", volume_data_folder_path, IM_ARRAYSIZE(volume_data_folder_path));
+                if (ImGui::Button("Loading Folder")) {
+                    file_names_raw = Nexus::FileLoader::GetAllFilesNamesWithinFolder(std::string(volume_data_folder_path), "raw");
+                    file_names_inf = Nexus::FileLoader::GetAllFilesNamesWithinFolder(std::string(volume_data_folder_path), "inf");
 
-					if (file_names_raw.empty() || file_names_inf.empty()) {
-						Nexus::Logger::Message(Nexus::LOG_WARNING, "There is no any volume data (.raw and .inf) files in this folder: ");
-						Nexus::Logger::Message(Nexus::LOG_WARNING, std::string(volume_data_folder_path));
-						Nexus::Logger::Message(Nexus::LOG_WARNING, "Please try another folder path to load.");
-						current_item_raw = "none";
-						current_item_inf = "none";
-						ImGui::OpenPopup("Error##01");
-					} else {
-						Nexus::Logger::Message(Nexus::LOG_INFO, "Folder Path: " + std::string(volume_data_folder_path));
-						Nexus::Logger::Message(Nexus::LOG_INFO, "Found " + std::to_string(file_names_raw.size()) + " raw files.");
-						Nexus::Logger::Message(Nexus::LOG_INFO, "Found " + std::to_string(file_names_inf.size()) + " inf files.");
-						current_item_raw = "Please select a file...";
-						current_item_inf = "Please select a file...";
-					}
-				}
-				
-				if (ImGui::BeginPopupModal("Error##01", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
-					ImGui::Text("There is no any volume data (.raw and .inf) files in this folder:\n");
-					ImGui::TextColored(ImVec4(0.6f, 0.8f, 0.0f, 1.0f), volume_data_folder_path);
-					ImGui::Text("Please try another folder path to load.\n\n");
-					ImGui::Separator();
+                    if (file_names_raw.empty() || file_names_inf.empty()) {
+                        Nexus::Logger::Message(Nexus::LOG_WARNING, "There is no any volume data (.raw and .inf) files in this folder: ");
+                        Nexus::Logger::Message(Nexus::LOG_WARNING, std::string(volume_data_folder_path));
+                        Nexus::Logger::Message(Nexus::LOG_WARNING, "Please try another folder path to load.");
+                        current_item_raw = "none";
+                        current_item_inf = "none";
+                        ImGui::OpenPopup("Error##01");
+                    } else {
+                        Nexus::Logger::Message(Nexus::LOG_INFO, "Folder Path: " + std::string(volume_data_folder_path));
+                        Nexus::Logger::Message(Nexus::LOG_INFO, "Found " + std::to_string(file_names_raw.size()) + " raw files.");
+                        Nexus::Logger::Message(Nexus::LOG_INFO, "Found " + std::to_string(file_names_inf.size()) + " inf files.");
+                        current_item_raw = "Please select a file...";
+                        current_item_inf = "Please select a file...";
+                    }
+                }
 
-					if (ImGui::Button("OK", ImVec2(120, 0))) { ImGui::CloseCurrentPopup(); }
-					ImGui::SetItemDefaultFocus();
-					ImGui::EndPopup();
-				}
-				ImGui::Spacing();
-				ImGui::Separator();
+                if (ImGui::BeginPopupModal("Error##01", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+                    ImGui::Text("There is no any volume data (.raw and .inf) files in this folder:\n");
+                    ImGui::TextColored(ImVec4(0.6f, 0.8f, 0.0f, 1.0f), "%s", volume_data_folder_path);
+                    ImGui::Text("Please try another folder path to load.\n\n");
+                    ImGui::Separator();
 
-				ImGui::TextColored(ImVec4(0.9f, 0.8f, 0.0f, 1.0f), "2. Select a volume data (raw and inf) to load.");
-				if (ImGui::BeginCombo("Volume Data (Raw)", current_item_raw.c_str())) {
-					for (int n = 0; n < file_names_raw.size(); n++) {
-						bool is_selected = (current_item_raw == file_names_raw[n]);
-						if (ImGui::Selectable(file_names_raw[n].c_str(), is_selected)) {
-							current_item_raw = file_names_raw[n];
-						}
-						if (is_selected) {
-							ImGui::SetItemDefaultFocus();
-						}
-					}
-					ImGui::EndCombo();
-				}
-				if (ImGui::BeginCombo("Volume Data (Inf)", current_item_inf.c_str())) {
-					for (int n = 0; n < file_names_inf.size(); n++) {
-						bool is_selected = (current_item_inf == file_names_inf[n]);
-						if (ImGui::Selectable(file_names_inf[n].c_str(), is_selected)) {
-							current_item_inf = file_names_inf[n];
-						}
-						if (is_selected) {
-							ImGui::SetItemDefaultFocus();
-						}
-					}
-					ImGui::EndCombo();
-				}
-				ImGui::SliderFloat("Gradient Threshold", &max_gradient, 1.0f, 400.0f);
-				if (ImGui::Button("Loading Files")) {
-					if (file_names_raw.empty() || file_names_inf.empty() || current_item_raw == "Please select a file..." || current_item_inf == "Please select a file..." || current_item_raw == "none" || current_item_inf == "none") {
-						Nexus::Logger::Message(Nexus::LOG_ERROR, "Please select a folder path and choose a volume data first!");
-						ImGui::OpenPopup("Error##02");
-					} else {
-						// ™Ï©l§∆
-						engine->Initialize(std::string(volume_data_folder_path) + "/" + current_item_inf, std::string(volume_data_folder_path) + "/" + current_item_raw, max_gradient);
+                    if (ImGui::Button("OK", ImVec2(120, 0))) { ImGui::CloseCurrentPopup(); }
+                    ImGui::SetItemDefaultFocus();
+                    ImGui::EndPopup();
+                }
+                ImGui::Spacing();
+                ImGui::Separator();
 
-						iso_value_histogram = engine->GetIsoValueHistogram();
-						iso_value_histogram_max = *std::max_element(iso_value_histogram.cbegin(), iso_value_histogram.cend());
+                ImGui::TextColored(ImVec4(0.9f, 0.8f, 0.0f, 1.0f), "2. Select a volume data (raw and inf) to load.");
+                if (ImGui::BeginCombo("Volume Data (Raw)", current_item_raw.c_str())) {
+                    for (int n = 0; n < file_names_raw.size(); n++) {
+                        bool is_selected = (current_item_raw == file_names_raw[n]);
+                        if (ImGui::Selectable(file_names_raw[n].c_str(), is_selected)) {
+                            current_item_raw = file_names_raw[n];
+                        }
+                        if (is_selected) {
+                            ImGui::SetItemDefaultFocus();
+                        }
+                    }
+                    ImGui::EndCombo();
+                }
+                if (ImGui::BeginCombo("Volume Data (Inf)", current_item_inf.c_str())) {
+                    for (int n = 0; n < file_names_inf.size(); n++) {
+                        bool is_selected = (current_item_inf == file_names_inf[n]);
+                        if (ImGui::Selectable(file_names_inf[n].c_str(), is_selected)) {
+                            current_item_inf = file_names_inf[n];
+                        }
+                        if (is_selected) {
+                            ImGui::SetItemDefaultFocus();
+                        }
+                    }
+                    ImGui::EndCombo();
+                }
+                ImGui::SliderFloat("Gradient Threshold", &max_gradient, 1.0f, 400.0f);
+                if (ImGui::Button("Loading Files")) {
+                    if (file_names_raw.empty() || file_names_inf.empty() || current_item_raw == "Please select a file..." || current_item_inf == "Please select a file..." || current_item_raw == "none" || current_item_inf == "none") {
+                        Nexus::Logger::Message(Nexus::LOG_ERROR, "Please select a folder path and choose a volume data first!");
+                        ImGui::OpenPopup("Error##02");
+                    } else {
+                        // ÂàùÂßãÂåñ
+                        engine->Initialize(std::string(volume_data_folder_path) + "/" + current_item_inf, std::string(volume_data_folder_path) + "/" + current_item_raw, max_gradient);
 
-						gradient_histogram = engine->GetGradientHistogram();
-						gradient_histogram_max = *std::max_element(gradient_histogram.cbegin(), gradient_histogram.cend());
+                        iso_value_histogram = engine->GetIsoValueHistogram();
+                        iso_value_histogram_max = *std::max_element(iso_value_histogram.cbegin(), iso_value_histogram.cend());
 
-						gradient_heatmap = engine->GetGradientHeatmap();
-						gradient_heatmap_max = 140.0f;
-						gradient_heatmap_min = 0.0f;
-						
-						engine->GetGradientHeatmapAxisLabels(gradient_heatmap_labelx_string, true);
-						engine->GetGradientHeatmapAxisLabels(gradient_heatmap_labely_string, false);
+                        gradient_histogram = engine->GetGradientHistogram();
+                        gradient_histogram_max = *std::max_element(gradient_histogram.cbegin(), gradient_histogram.cend());
 
-						gradient_heatmap_labelx.clear();
-						for (int i = 0; i < gradient_heatmap_labelx_string.size(); i++) {
-							gradient_heatmap_labelx.push_back(gradient_heatmap_labelx_string[i].c_str());
-						}
-						gradient_heatmap_labely.clear();
-						for (int i = gradient_heatmap_labely_string.size() - 1; i >=0; i--) {
-							gradient_heatmap_labely.push_back(gradient_heatmap_labely_string[i].c_str());
-						}
-						
-					}
-				}
-				ImGui::Spacing();
-				
-				if (engine->GetIsInitialize()) {
-					// ≈„•‹©“≈™®˙™∫ raw ©M inf ∏ÍÆ∆
-					if (ImGui::CollapsingHeader("Volume Data Attributes")) {
-						ImGui::BulletText("Resolution: %.2f, %.2f, %.2f", engine->GetResolution().x, engine->GetResolution().y, engine->GetResolution().z);
-						ImGui::BulletText("Ratio: %.2f, %.2f, %.2f", engine->GetRatio().x, engine->GetRatio().y, engine->GetRatio().z);
-						ImGui::BulletText("DataType: %s", engine->GetDataType());
-						ImGui::BulletText("Endian: %s", engine->GetEndian());
-					}
-					if (ImGui::CollapsingHeader("Gradient Histogram")) {
-						ImGui::PlotHistogram("Gradient Histogram", gradient_histogram.data(), gradient_histogram.size(), 0, NULL, 0.0f, gradient_histogram_max, ImVec2(0, 300));
-					}
-					if (ImGui::CollapsingHeader("Gradient Heatmaps")) {
-						static ImPlotColormap map = ImPlotColormap_Viridis;
-						if (ImPlot::ColormapButton(ImPlot::GetColormapName(map), ImVec2(512, 0), map)) {
-							map = (map + 1) % ImPlot::GetColormapCount();
-							ImPlot::BustColorCache("##Heatmap1");
-						}
-						ImGui::SameLine();
-						ImGui::LabelText("##Colormap Index", "%s", "Change Colormap");
+                        gradient_heatmap = engine->GetGradientHeatmap();
+                        gradient_heatmap_max = 140.0f;
+                        gradient_heatmap_min = 0.0f;
 
-						ImGui::SetNextItemWidth(512);
-						ImGui::DragFloatRange2("Min / Max", &gradient_heatmap_min, &gradient_heatmap_max, 10.0f, 0, 20000);
+                        engine->GetGradientHeatmapAxisLabels(gradient_heatmap_labelx_string, true);
+                        engine->GetGradientHeatmapAxisLabels(gradient_heatmap_labely_string, false);
+
+                        gradient_heatmap_labelx.clear();
+                        for (int i = 0; i < gradient_heatmap_labelx_string.size(); i++) {
+                            gradient_heatmap_labelx.push_back(gradient_heatmap_labelx_string[i].c_str());
+                        }
+                        gradient_heatmap_labely.clear();
+                        for (int i = gradient_heatmap_labely_string.size() - 1; i >=0; i--) {
+                            gradient_heatmap_labely.push_back(gradient_heatmap_labely_string[i].c_str());
+                        }
+
+                    }
+                }
+                ImGui::Spacing();
+
+                if (engine->GetIsInitialize()) {
+                    // È°ØÁ§∫ÊâÄËÆÄÂèñÁöÑ raw Âíå inf Ë≥áÊñô
+                    if (ImGui::CollapsingHeader("Volume Data Attributes")) {
+                        ImGui::BulletText("Resolution: %.2f, %.2f, %.2f", engine->GetResolution().x, engine->GetResolution().y, engine->GetResolution().z);
+                        ImGui::BulletText("Ratio: %.2f, %.2f, %.2f", engine->GetRatio().x, engine->GetRatio().y, engine->GetRatio().z);
+                        ImGui::BulletText("DataType: %s", engine->GetDataType().c_str());
+                        ImGui::BulletText("Endian: %s", engine->GetEndian().c_str());
+                    }
+                    if (ImGui::CollapsingHeader("Gradient Histogram")) {
+                        ImGui::PlotHistogram("Gradient Histogram", gradient_histogram.data(), gradient_histogram.size(), 0, NULL, 0.0f, gradient_histogram_max, ImVec2(0, 300));
+                    }
+                    if (ImGui::CollapsingHeader("Gradient Heatmaps")) {
+                        static ImPlotColormap map = ImPlotColormap_Viridis;
+                        if (ImPlot::ColormapButton(ImPlot::GetColormapName(map), ImVec2(512, 0), map)) {
+                            map = (map + 1) % ImPlot::GetColormapCount();
+                            ImPlot::BustColorCache("##Heatmap1");
+                        }
+                        ImGui::SameLine();
+                        ImGui::LabelText("##Colormap Index", "%s", "Change Colormap");
+
+                        ImGui::SetNextItemWidth(512);
+                        ImGui::DragFloatRange2("Min / Max", &gradient_heatmap_min, &gradient_heatmap_max, 10.0f, 0, 20000);
 
 
-						
-						static ImPlotAxisFlags axes_flags = ImPlotAxisFlags_Lock | ImPlotAxisFlags_NoGridLines | ImPlotAxisFlags_NoTickMarks;
-						ImPlot::PushColormap(map);
-						ImPlot::SetNextPlotTicksX(0, 1, 5, gradient_heatmap_labelx.data());
-						ImPlot::SetNextPlotTicksY(1, 0, 5, gradient_heatmap_labely.data());
-						if (ImPlot::BeginPlot("##Heatmap1", NULL, NULL, ImVec2(512, 512), ImPlotFlags_NoLegend, axes_flags, axes_flags)) {
-							ImPlot::PlotHeatmap("heat", gradient_heatmap.data(), engine->Interval, engine->Interval, gradient_heatmap_min, gradient_heatmap_max, NULL);
-							ImPlot::EndPlot();
-						}
-						ImGui::SameLine();
-						ImPlot::ColormapScale("##HeatScale", gradient_heatmap_min, gradient_heatmap_max, ImVec2(60, 512));
-						ImPlot::PopColormap();
-					}
-				}
-				
-				if (ImGui::BeginPopupModal("Error##02", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
-					ImGui::Text("Please select a folder path and choose a volume data first!\n\n");
-					ImGui::Separator();
 
-					if (ImGui::Button("OK", ImVec2(120, 0))) { ImGui::CloseCurrentPopup(); }
-					ImGui::SetItemDefaultFocus();
-					ImGui::EndPopup();
-				}
+                        static ImPlotAxisFlags axes_flags = ImPlotAxisFlags_Lock | ImPlotAxisFlags_NoGridLines | ImPlotAxisFlags_NoTickMarks;
+                        ImPlot::PushColormap(map);
+                        ImPlot::SetNextPlotTicksX(0, 1, 5, gradient_heatmap_labelx.data());
+                        ImPlot::SetNextPlotTicksY(1, 0, 5, gradient_heatmap_labely.data());
+                        if (ImPlot::BeginPlot("##Heatmap1", NULL, NULL, ImVec2(512, 512), ImPlotFlags_NoLegend, axes_flags, axes_flags)) {
+                            ImPlot::PlotHeatmap("heat", gradient_heatmap.data(), engine->Interval, engine->Interval, gradient_heatmap_min, gradient_heatmap_max, NULL);
+                            ImPlot::EndPlot();
+                        }
+                        ImGui::SameLine();
+                        ImPlot::ColormapScale("##HeatScale", gradient_heatmap_min, gradient_heatmap_max, ImVec2(60, 512));
+                        ImPlot::PopColormap();
+                    }
+                }
 
-				ImGui::EndTabItem();
-			}
+                if (ImGui::BeginPopupModal("Error##02", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+                    ImGui::Text("Please select a folder path and choose a volume data first!\n\n");
+                    ImGui::Separator();
 
-			if (ImGui::BeginTabItem("Volume Setting")) {
-				if (engine->GetIsInitialize()) {
-					if (ImGui::CollapsingHeader("Histograms")) {
-						ImGui::PlotHistogram("Histogram", iso_value_histogram.data(), iso_value_histogram.size(), 0, NULL, 0.0f, iso_value_histogram_max, ImVec2(0, 300));
-					}
-					if (ImGui::Button("Equalization")) {
-						engine->IsoValueHistogramEqualization();
-						iso_value_histogram = engine->GetIsoValueHistogram();
+                    if (ImGui::Button("OK", ImVec2(120, 0))) { ImGui::CloseCurrentPopup(); }
+                    ImGui::SetItemDefaultFocus();
+                    ImGui::EndPopup();
+                }
 
-						engine->GenerateGradientHeatMap();
-						gradient_heatmap = engine->GetGradientHeatmap();
-						gradient_heatmap_max = 140.0f;
-						gradient_heatmap_min = 0.0f;
-					}
-					ImGui::Spacing();
-					ImGui::Separator();
+                ImGui::EndTabItem();
+            }
 
-					if (ImGui::BeginCombo("Render Mode", current_render_mode.c_str())) {
-						for (int n = 0; n < render_modes.size(); n++) {
-							bool is_selected = (current_render_mode == render_modes[n]);
-							if (ImGui::Selectable(render_modes[n].c_str(), is_selected)) {
-								current_render_mode = render_modes[n];
-								switch (n) {
-								case 0:
-									engine->SetCurrentRenderMode(Nexus::RENDER_MODE_ISO_SURFACE);
-									break;
-								case 1:
-									engine->SetCurrentRenderMode(Nexus::RENDER_MODE_RAY_CASTING);
-									break;
-								}
-							}
-							if (is_selected) {
-								ImGui::SetItemDefaultFocus();
-							}
-						}
-						ImGui::EndCombo();
-					}
-					ImGui::Spacing();
-					ImGui::Separator();
+            if (ImGui::BeginTabItem("Volume Setting")) {
+                if (engine->GetIsInitialize()) {
+                    if (ImGui::CollapsingHeader("Histograms")) {
+                        ImGui::PlotHistogram("Histogram", iso_value_histogram.data(), iso_value_histogram.size(), 0, NULL, 0.0f, iso_value_histogram_max, ImVec2(0, 300));
+                    }
+                    if (ImGui::Button("Equalization")) {
+                        engine->IsoValueHistogramEqualization();
+                        iso_value_histogram = engine->GetIsoValueHistogram();
 
-					if (engine->GetCurrentRenderMode() == Nexus::RENDER_MODE_ISO_SURFACE) {
-						ImGui::SliderFloat("Iso Value", &iso_value, 0, 255);
-						if (ImGui::Button("Generate")) {
-							if (engine->GetIsInitialize()) {
-								engine->SetIsoValue(iso_value);
-								engine->ConvertToPolygon();
-								engine->Debug();
-								// iso_value_shader = iso_value;
-							} else {
-								Nexus::Logger::Message(Nexus::LOG_ERROR, "YOU MUST LOAD THE VOLUME DATA FIRST and COMPUTE THESE ISO SURFACE VERTICES.");
-							}
-						}
-						ImGui::Spacing();
-						ImGui::Separator();
-						ImGui::Checkbox("Normal Visualize", &Settings.NormalVisualize);
-						ImGui::SameLine();
-						ImGui::Checkbox("Wire Frame Mode", engine->WireFrameModeHelper());
-					} else if (engine->GetCurrentRenderMode() == Nexus::RENDER_MODE_RAY_CASTING) {
-						ImGui::SliderFloat("Sample Rate", &sample_rate, 0.01, 1);
-						ImGui::Checkbox("Normal Color", &use_normal_color);
-						ImGui::Checkbox("Lighting", &use_lighting);
-						if (ImGui::Button("Generate")) {
-							if (engine->GetIsInitialize()) {
-								engine->ConvertToPolygon();
-								engine->Debug();
-							} else {
-								Nexus::Logger::Message(Nexus::LOG_ERROR, "YOU MUST LOAD THE VOLUME DATA FIRST and COMPUTE THESE ISO SURFACE VERTICES.");
-							}
-						}
-					}
-					
-					
-				} else {
-					ImGui::TextColored(ImVec4(0.9f, 0.2f, 0.0f, 1.0f), "You must load the volume data first and compute these iso surface vertices.");
-				}
-				
-				
-				
-				ImGui::EndTabItem();
-			}
-		}
-		ImGui::Spacing();
-		ImGui::Separator();
-		ImGui::End();
+                        engine->GenerateGradientHeatMap();
+                        gradient_heatmap = engine->GetGradientHeatmap();
+                        gradient_heatmap_max = 140.0f;
+                        gradient_heatmap_min = 0.0f;
+                    }
+                    ImGui::Spacing();
+                    ImGui::Separator();
+
+                    if (ImGui::BeginCombo("Render Mode", current_render_mode.c_str())) {
+                        for (int n = 0; n < render_modes.size(); n++) {
+                            bool is_selected = (current_render_mode == render_modes[n]);
+                            if (ImGui::Selectable(render_modes[n].c_str(), is_selected)) {
+                                current_render_mode = render_modes[n];
+                                switch (n) {
+                                case 0:
+                                    engine->SetCurrentRenderMode(Nexus::RENDER_MODE_ISO_SURFACE);
+                                    break;
+                                case 1:
+                                    engine->SetCurrentRenderMode(Nexus::RENDER_MODE_RAY_CASTING);
+                                    break;
+                                }
+                            }
+                            if (is_selected) {
+                                ImGui::SetItemDefaultFocus();
+                            }
+                        }
+                        ImGui::EndCombo();
+                    }
+                    ImGui::Spacing();
+                    ImGui::Separator();
+
+                    if (engine->GetCurrentRenderMode() == Nexus::RENDER_MODE_ISO_SURFACE) {
+                        ImGui::SliderFloat("Iso Value", &iso_value, 0, 255);
+                        if (ImGui::Button("Generate")) {
+                            if (engine->GetIsInitialize()) {
+                                engine->SetIsoValue(iso_value);
+                                engine->ConvertToPolygon();
+                                engine->Debug();
+                                // iso_value_shader = iso_value;
+                            } else {
+                                Nexus::Logger::Message(Nexus::LOG_ERROR, "YOU MUST LOAD THE VOLUME DATA FIRST and COMPUTE THESE ISO SURFACE VERTICES.");
+                            }
+                        }
+                        ImGui::Spacing();
+                        ImGui::Separator();
+                        ImGui::Checkbox("Normal Visualize", &Settings.NormalVisualize);
+                        ImGui::SameLine();
+                        ImGui::Checkbox("Wire Frame Mode", engine->WireFrameModeHelper());
+                    } else if (engine->GetCurrentRenderMode() == Nexus::RENDER_MODE_RAY_CASTING) {
+                        ImGui::SliderFloat("Sample Rate", &sample_rate, 0.01, 1);
+                        ImGui::Checkbox("Normal Color", &use_normal_color);
+                        ImGui::Checkbox("Lighting", &use_lighting);
+                        if (ImGui::Button("Generate")) {
+                            if (engine->GetIsInitialize()) {
+                                engine->ConvertToPolygon();
+                                engine->Debug();
+                            } else {
+                                Nexus::Logger::Message(Nexus::LOG_ERROR, "YOU MUST LOAD THE VOLUME DATA FIRST and COMPUTE THESE ISO SURFACE VERTICES.");
+                            }
+                        }
+                    }
+
+
+                } else {
+                    ImGui::TextColored(ImVec4(0.9f, 0.2f, 0.0f, 1.0f), "You must load the volume data first and compute these iso surface vertices.");
+                }
+
+
+
+                ImGui::EndTabItem();
+            }
+
+            ImGui::EndTabBar();
+        }
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::End();
 
 		ImGui::Begin("General Setting");
 		if (ImGui::BeginTabBar("GeneralTabBar", tab_bar_flags)) {
@@ -598,7 +604,7 @@ public:
 			}
 
 			if (ImGui::BeginTabItem("Light Setting")) {
-				// ∑sºW Light Position
+				// Êñ∞Â¢û Light Position
 				ImGui::SliderFloat3("Light Color", point_light->GetDiffusePointer(), 0.0f, 1.0f);
 
 				ImGui::EndTabItem();
@@ -639,14 +645,14 @@ public:
 	}
 
 	void DrawOriginAnd3Axes(Nexus::Shader* shader) const {
-		// √∏ªs•@¨…ß§º–®t≠Ï¬I°]0, 0, 0°^
+		// Áπ™Ë£Ω‰∏ñÁïåÂùêÊ®ôÁ≥ªÂéüÈªûÔºà0, 0, 0Ôºâ
 		model->Push();
 		model->Save(glm::scale(model->Top(), glm::vec3(0.8f, 0.8f, 0.8f)));
 		shader->SetVec3("objectColor", glm::vec3(0.2f, 0.2f, 0.2f));
 		sphere->Draw(shader, model->Top());
 		model->Pop();
 
-		// √∏ªs§T≠”∂b
+		// Áπ™Ë£Ω‰∏âÂÄãËª∏
 		model->Push();
 		model->Push();
 		model->Save(glm::translate(model->Top(), glm::vec3(100.0f, 0.0f, 0.0f)));
@@ -686,6 +692,8 @@ public:
 			case Nexus::DISPLAY_MODE_DEFAULT:
 				view = Settings.EnableGhostMode ? first_camera->GetViewMatrix() : third_camera->GetViewMatrix();
 				break;
+            default:
+                break;
 		}
 	}
 
@@ -706,18 +714,20 @@ public:
 	void SetViewport(Nexus::DisplayMode monitor_type) override {
 		if (Settings.CurrentDisplyMode == Nexus::DISPLAY_MODE_3O1P) {
 			switch (monitor_type) {
-			case Nexus::DISPLAY_MODE_ORTHOGONAL_X:
-				glViewport(0, Settings.Height / 2, Settings.Width / 2, Settings.Height / 2);
-				break;
-			case Nexus::DISPLAY_MODE_ORTHOGONAL_Y:
-				glViewport(Settings.Width / 2, Settings.Height / 2, Settings.Width / 2, Settings.Height / 2);
-				break;
-			case Nexus::DISPLAY_MODE_ORTHOGONAL_Z:
-				glViewport(0, 0, Settings.Width / 2, Settings.Height / 2);
-				break;
-			case Nexus::DISPLAY_MODE_DEFAULT:
-				glViewport(Settings.Width / 2, 0, Settings.Width / 2, Settings.Height / 2);
-				break;
+                case Nexus::DISPLAY_MODE_ORTHOGONAL_X:
+                    glViewport(0, Settings.Height / 2, Settings.Width / 2, Settings.Height / 2);
+                    break;
+                case Nexus::DISPLAY_MODE_ORTHOGONAL_Y:
+                    glViewport(Settings.Width / 2, Settings.Height / 2, Settings.Width / 2, Settings.Height / 2);
+                    break;
+                case Nexus::DISPLAY_MODE_ORTHOGONAL_Z:
+                    glViewport(0, 0, Settings.Width / 2, Settings.Height / 2);
+                    break;
+                case Nexus::DISPLAY_MODE_DEFAULT:
+                    glViewport(Settings.Width / 2, 0, Settings.Width / 2, Settings.Height / 2);
+                    break;
+                default:
+                    break;
 			}
 		} else {
 			glViewport(0, 0, Settings.Width, Settings.Height);
