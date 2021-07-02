@@ -269,7 +269,7 @@ public:
 
 		// ImGui::ShowDemoWindow();
 		// ImPlot::ShowDemoWindow();
-		ImGui::ShowBezierDemo();
+		// ImGui::ShowBezierDemo();
 	}
 
 	void ShowDebugUI() override {
@@ -278,10 +278,11 @@ public:
 		ImVec2 center = ImGui::GetMainViewport()->GetCenter();
 		ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
 
-
+        /*
 		ImGui::Begin("Transfer Function Example");
 		tf.ShowUI();
 		ImGui::End();
+        */
 
 		if (engine->GetCurrentRenderMode() == Nexus::RENDER_MODE_RAY_CASTING) {
 			// 使用 Ray Casting 才會生成 Transfer Function
