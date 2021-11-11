@@ -140,9 +140,7 @@ public:
 		myShader->SetBool("is_volume", false);
 
 		// ==================== Draw origin and 3 axes ====================
-		if (Settings.ShowOriginAnd3Axes) {
-			this->DrawOriginAnd3Axes(myShader.get());
-		}
+
 
 		if (engine->GetCurrentRenderMode() == Nexus::RENDER_MODE_ISO_SURFACE) {
 			// Iso Surface
@@ -176,7 +174,7 @@ public:
 
 			if (engine->GetIsInitialize() && engine->GetIsReadyToDraw()) {
 				model->Push();
-				model->Save(glm::translate(model->Top(), engine->GetResolution() * -0.5f));
+				model->Save(glm::translate(model->Top(), engine->GetResolution() * engine->GetRatio() * -0.5f));
 				//model->Save(glm::translate(model->Top(), glm::vec3(-149 / 2.0f, -208 / 2.0f, -110 / 2.0f)));
 				glActiveTexture(GL_TEXTURE0);
 				glBindTexture(GL_TEXTURE_3D, engine->GetVolumeTexture());
@@ -186,9 +184,11 @@ public:
 				model->Pop();
 			}
 
-			
-
-			
+            glDisable(GL_DEPTH_TEST);
+            if (Settings.ShowOriginAnd3Axes) {
+                this->DrawOriginAnd3Axes(myShader.get());
+            }
+            glEnable(GL_DEPTH_TEST);
 
 			/*
 			// Frame buffer binding
@@ -646,9 +646,11 @@ public:
 	}
 
 	void DrawOriginAnd3Axes(Nexus::Shader* shader) const {
+        shader->Use();
+
 		// 繪製世界坐標系原點（0, 0, 0）
 		model->Push();
-		model->Save(glm::scale(model->Top(), glm::vec3(0.8f, 0.8f, 0.8f)));
+		model->Save(glm::scale(model->Top(), glm::vec3(5.0f)));
 		shader->SetVec3("objectColor", glm::vec3(0.2f, 0.2f, 0.2f));
 		sphere->Draw(shader, model->Top());
 		model->Pop();
@@ -672,7 +674,7 @@ public:
 		model->Push();
 		model->Save(glm::translate(model->Top(), glm::vec3(0.0f, 0.0f, 100.0f)));
 		model->Save(glm::scale(model->Top(), glm::vec3(1.0f, 1.0f, 200.0f)));
-		shader->SetVec3("objectColor", glm::vec3(0.0f, 0.0f, 1.0f));
+		shader->SetVec3("objectColor", glm::vec3(0.0f, 0.5f, 1.0f));
 		cube->Draw(shader, model->Top());
 		model->Pop();
 		model->Pop();

@@ -9,6 +9,7 @@ in VS_OUT {
 uniform sampler3D volume;
 uniform sampler1D transfer_function;
 uniform vec3 volume_resolution;
+uniform vec3 volume_ratio;
 
 uniform vec3 lightPos; 
 uniform vec3 viewPos; 
@@ -75,13 +76,13 @@ void main() {
             break;
          }
 
-        // ¹ê»Úªº¦ì¸m¤]§ïÅÜ¡A¬Û¹ï§÷½è®y¼Ğ¤]­n§ïÅÜ
+        // å¯¦éš›çš„ä½ç½®ä¹Ÿæ”¹è®Šï¼Œç›¸å°æè³ªåº§æ¨™ä¹Ÿè¦æ”¹è®Š
         current_pos = current_pos + ray_direction * sample_rate;
 
         vec3 ray_direction_in_texture = vec3(1.0f);
-        ray_direction_in_texture.x = ray_direction.x / volume_resolution.x;
-        ray_direction_in_texture.y = ray_direction.y / volume_resolution.y;
-        ray_direction_in_texture.z = ray_direction.z / volume_resolution.z;
+        ray_direction_in_texture.x = ray_direction.x / (volume_resolution.x * volume_ratio.x);
+        ray_direction_in_texture.y = ray_direction.y / (volume_resolution.y * volume_ratio.y);
+        ray_direction_in_texture.z = ray_direction.z / (volume_resolution.z * volume_ratio.z);
 
         sample_pos = sample_pos + ray_direction_in_texture * sample_rate;
         if (current_pos.x < -volume_resolution.x / 2.0f || current_pos.x > volume_resolution.x / 2.0f) {
