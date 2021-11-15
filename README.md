@@ -1,5 +1,8 @@
 # Scientific Visualization - Volume Rendering
 
+## 2021/11/14
+* 修正讀取非 1:1:1 Ratio 的 Volume Data，在 Ray Casting 跟 ISO Surface 會有比例不對的問題。
+
 ## Future Work
 * Post Processing by using framebuffer (edge detected or gaussian blur)
 * Transfer function (UI need improve) => RGB (the knots) (Beizer Curve) [Developing]

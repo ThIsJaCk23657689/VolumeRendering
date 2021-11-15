@@ -146,7 +146,7 @@ public:
 			// Iso Surface
 			if (engine->GetIsInitialize() && engine->GetIsReadyToDraw()) {
 				model->Push();
-				model->Save(glm::translate(model->Top(), engine->GetResolution() * -0.5f));
+				model->Save(glm::translate(model->Top(), engine->GetResolution() * engine->GetRatio() * -0.5f));
 				myShader->SetVec3("objectColor", glm::vec3(0.482352941, 0.68627451, 0.929411765));
 				engine->Draw(myShader.get(), model->Top());
 				if (Settings.NormalVisualize) {
@@ -184,11 +184,7 @@ public:
 				model->Pop();
 			}
 
-            glDisable(GL_DEPTH_TEST);
-            if (Settings.ShowOriginAnd3Axes) {
-                this->DrawOriginAnd3Axes(myShader.get());
-            }
-            glEnable(GL_DEPTH_TEST);
+
 
 			/*
 			// Frame buffer binding
@@ -267,6 +263,12 @@ public:
 			*/
 		}
 
+        glDisable(GL_DEPTH_TEST);
+        if (Settings.ShowOriginAnd3Axes) {
+            this->DrawOriginAnd3Axes(myShader.get());
+        }
+        glEnable(GL_DEPTH_TEST);
+
 		// ImGui::ShowDemoWindow();
 		// ImPlot::ShowDemoWindow();
 		// ImGui::ShowBezierDemo();
@@ -278,13 +280,11 @@ public:
 		ImVec2 center = ImGui::GetMainViewport()->GetCenter();
 		ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
 
-        /*
 		ImGui::Begin("Transfer Function Example");
 		tf.ShowUI();
 		ImGui::End();
-        */
 
-		if (engine->GetCurrentRenderMode() == Nexus::RENDER_MODE_RAY_CASTING) {
+		if (!engine->GetCurrentRenderMode() == Nexus::RENDER_MODE_RAY_CASTING) {
 			// 使用 Ray Casting 才會生成 Transfer Function
 			ImGui::Begin("Transfer Function");
 			if (ImGui::Button("Export")) {
