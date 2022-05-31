@@ -16,12 +16,10 @@
 #include <imgui_internal.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
-#include <imgui_bazier.h>
 #include <implot.h>
 #include <algorithm>
 #include <random>
 #include <transfer_function_widget.h>
-#include <transfer_function.h>
 
 class VolumeRendering final : public Nexus::Application {
 public:
@@ -281,10 +279,9 @@ public:
 		ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
 
 		ImGui::Begin("Transfer Function Example");
-		tf.ShowUI();
 		ImGui::End();
 
-		if (!engine->GetCurrentRenderMode() == Nexus::RENDER_MODE_RAY_CASTING) {
+		if (engine->GetCurrentRenderMode() == Nexus::RENDER_MODE_RAY_CASTING) {
 			// 使用 Ray Casting 才會生成 Transfer Function
 			ImGui::Begin("Transfer Function");
 			if (ImGui::Button("Export")) {
@@ -421,8 +418,8 @@ public:
 
                         static ImPlotAxisFlags axes_flags = ImPlotAxisFlags_Lock | ImPlotAxisFlags_NoGridLines | ImPlotAxisFlags_NoTickMarks;
                         ImPlot::PushColormap(map);
-                        ImPlot::SetNextPlotTicksX(0, 1, 5, gradient_heatmap_labelx.data());
-                        ImPlot::SetNextPlotTicksY(1, 0, 5, gradient_heatmap_labely.data());
+                        // ImPlot::SetNextPlotTicksX(0, 1, 5, gradient_heatmap_labelx.data());
+                        // ImPlot::SetNextPlotTicksY(1, 0, 5, gradient_heatmap_labely.data());
                         if (ImPlot::BeginPlot("##Heatmap1", NULL, NULL, ImVec2(512, 512), ImPlotFlags_NoLegend, axes_flags, axes_flags)) {
                             ImPlot::PlotHeatmap("heat", gradient_heatmap.data(), engine->Interval, engine->Interval, gradient_heatmap_min, gradient_heatmap_max, NULL);
                             ImPlot::EndPlot();
@@ -923,8 +920,6 @@ private:
 	// bool enable_transfer_function = false;
 	TransferFunctionWidget tf_widget;
 	GLuint transfer_function_texture;
-
-	TransferFunction tf;
 
 	GLuint framebuffer, rbo;
 	std::unique_ptr<Nexus::Texture2D> texture_color_buffer = nullptr;

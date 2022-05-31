@@ -1,25 +1,21 @@
 # Scientific Visualization - Volume Rendering
 
-## 2021/11/14
-* 修正讀取非 1:1:1 Ratio 的 Volume Data，在 Ray Casting 跟 ISO Surface 會有比例不對的問題。
+2021 年 3 ~ 5月科學視算的作業，有 ISO Surface 和 Volume Rendering (Ray Casting) 兩大功能。
 
-## Future Work
-* Post Processing by using framebuffer (edge detected or gaussian blur)
-* Transfer function (UI need improve) => RGB (the knots) (Beizer Curve) [Developing]
-* 讀取 inf 檔案 (新增支援 BigEndian)
+> 注意: 此版本為舊版，作者將再也不更新，甚至未來會考慮刪除。Volume Rendering 已經有新版本的了，請參考[這邊](https://github.com/ThIsJaCk23657689/VolumeRenderer)
 
-## 不是很急，but easy to do...
-* 調整Gradient的閥值，但是發現Heatmap的最大Y值變動很奇怪
-* Add a point light struct in fragment shader
-* Iso Surface 的顏色 => UI Control
-* the culling plane (one normal vector and a position)
-* Output the transfer function to a disk file (Cloud be more information)
+### 安裝需求
+因為有 submodule 所以 clone 下來時記得加上參數 `--recursive`
+```
+$ git clone --recursive https://github.com/ThIsJaCk23657689/VolumeRenderer.git
+```
 
-## If i have some spare time, to do...
-* Square => high frequencies with high opacities; low opacities for other table entries.
-* Slicing Method
-* View-Align or Axis-Align
-* Back to front
+需要使用 vcpkg 安裝以下套件：
+* glfw3
+* glad
+* glm
+* imgui[core,opengl3-binding,glfw-binding]
+* stb
 
 ![](https://i.imgur.com/Ke7oSoX.png)
 
